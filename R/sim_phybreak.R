@@ -99,17 +99,17 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
   ### simulate step by step
   if(is.na(obsize)) {
     if(spatial) {
-      res <- sim_outbreak_spatial(popsize, R0, introductions, intro.dist, gen.shape, gen.mean,
+      res <- sim_outbreak_spatial(popsize, R0, introductions, intro.rate, gen.shape, gen.mean,
                           sample.shape, sample.mean, dist.model, dist.exponent, dist.scale)
     } else {
-      res <- sim_outbreak(popsize, R0, introductions, intro.dist, gen.shape, gen.mean,
+      res <- sim_outbreak(popsize, R0, introductions, intro.rate, gen.shape, gen.mean,
                           sample.shape, sample.mean)
     }
      obsize <- res$obs
      if(obsize == 1) return(c("Outbreak size = 1"))
   } else {
     if(spatial) {
-      res <- sim_outbreak_size_spatial(obsize, popsize, R0, introductions, intro.dist, gen.shape, gen.mean,
+      res <- sim_outbreak_size_spatial(obsize, popsize, R0, introductions, intro.rate, gen.shape, gen.mean,
                                sample.shape, sample.mean, dist.model, dist.exponent, dist.scale)
     } else {
       res <- sim_outbreak_size(obsize, popsize, introductions, intro.rate, R0, gen.shape, gen.mean,
@@ -142,8 +142,7 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
                        host.names = hostnames[c(1:obs, addsamplehosts)],
                        sim.infection.times = inftimes,
                        sim.infectors = infectors,
-                       sim.tree = treeout,
-                       external.seq = FALSE
+                       sim.tree = treeout
                 ))
   } else {
     toreturn <- with(res,
@@ -151,11 +150,10 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
       sequences = sequences,
       sample.times = c(samtimes, addsampletimes),
       sample.names = samplenames,
-      host.names = hostnames,
+      host.names = hostnames[c(1:obs, addsamplehosts)],
       sim.infection.times = inftimes,
       sim.infectors = infectors,
-      sim.tree = treeout,
-      external.sequence = FALSE
+      sim.tree = treeout
     ))
     #toreturn$sim.hist.time <- histtime
   }
@@ -188,16 +186,16 @@ sim_outbreak_size <- function(obsize, Npop, intronr, introrate, R0, aG, mG, aS, 
   return(sim)
 }
 
-sim_outbreak_size_spatial <- function(obsize, Npop, R0, intro, introdist, aG, mG, aS, mS, dist.model, dist.exponent, dist.scale) {
+sim_outbreak_size_spatial <- function(obsize, Npop, R0, intronr, introrate, aG, mG, aS, mS, dist.model, dist.exponent, dist.scale) {
   if(is.na(Npop)) {
     Npop <- obsize
     while(1 - obsize/Npop < exp(-R0* obsize/Npop)) {Npop <- Npop + 1}
   } 
   
-  sim <- sim_outbreak_spatial(Npop, R0, intro, introdist, aG, mG, aS, mS, dist.model, dist.exponent, dist.scale)
+  sim <- sim_outbreak_spatial(Npop, R0, intro, introrate, aG, mG, aS, mS, dist.model, dist.exponent, dist.scale)
   
-  while(sim$obs != obsize | sum(sim$infectors==1) != intro) {
-    sim <- sim_outbreak_spatial(Npop, R0, intro, introdist, aG, mG, aS, mS, dist.model, dist.exponent, dist.scale)
+  while(sim$obs != obsize) {
+    sim <- sim_outbreak_spatial(Npop, R0, intronr, introrate, aG, mG, aS, mS, dist.model, dist.exponent, dist.scale)
   }
   
   return(sim)
@@ -261,7 +259,7 @@ sim_outbreak <- function(Npop, intronr, introrate, R0, aG, mG, aS, mS) {
 }
 
 ### simulate a spatial outbreak
-sim_outbreak_spatial <- function(Npop, R0, intro, aG, mG, aS, mS, dist.model, dist.exponent, dist.scale) {
+sim_outbreak_spatial <- function(Npop, R0, intronr, introrate, aG, mG, aS, mS, dist.model, dist.exponent, dist.scale) {
   ### initialize spatial population model
   x <- runif(Npop, 0, sqrt(Npop))
   y <- runif(Npop, 0, sqrt(Npop))
@@ -275,50 +273,32 @@ sim_outbreak_spatial <- function(Npop, R0, intro, aG, mG, aS, mS, dist.model, di
   # matrixR0 <- max(eigen(dist_densities)$values)
   matrixR0 <- sum(dist_densities)/Npop
   R0_matrix <- R0 * dist_densities / matrixR0
-  if(intro > 1){
-    R0_matrix <- cbind(0,R0_matrix)
-    R0_matrix <- rbind(0,R0_matrix)
-  }
 
   ### initialize outbreak
-  inftimes <- c(0, rep(10000, Npop))
-  sources <- rep(0, Npop+1)
+  introintervals <- rexp(intronr - 1, rate = introrate)
+  inftimes <- c(0, cumsum(introintervals), rep(10000, Npop - intronr))
+  sources <- rep(0, Npop)
   nrcontacts <- c(intro,rpois(Npop, rowSums(R0_matrix)))
   nth.infection <- 1
   currentID <- 1
   
-  if (introdist == "exp")
-    r <- (R0^(1/aG)-1)/(mG/aG)
-  else 
-    r <- 0
-  
   ### by order of infection, sample secondary infections
   # currentID is the infected host under consideration
-  while(nth.infection <= Npop+1 & inftimes[currentID] != 10000) {
+  while(nth.infection <= Npop & inftimes[currentID] != 10000) {
     #when does currentID make infectious contacts?
     #reverse sorting so that with double contacts, the earliest will be used last
     whencontacts <- sort(inftimes[currentID] + rgamma(nrcontacts[currentID], aG, aG/mG),decreasing = TRUE)
     
     #who are these contacts made with?
-    if(intro > 1){
-      if(currentID == 1) {
-        whocontacted <- sample(Npop+1, nrcontacts[currentID], replace = FALSE)
-        X <- runif(nrcontacts[currentID]-1)
-        Y <- ifelse(rep(R0,length(X))>1, log(X*exp(r*log(Npop,R0)*mG)-X+1)/r, runif(nrcontacts[currentID]-1,0,log(Npop,R0)*mG))
-        whencontacts <- sort(c(0,Y), decreasing = TRUE)
-      } else {
-        whocontacted <- sample(Npop+1, nrcontacts[currentID], replace = TRUE, prob = R0_matrix[currentID, ])
-      }
-    } else {
-      whocontacted <- sample(Npop, nrcontacts[currentID], replace = TRUE, prob = R0_matrix[currentID, ])
-    }
+    whocontacted <- sample(Npop, nrcontacts[currentID], replace = TRUE, prob = R0_matrix[currentID, ])
     
     #are these contacts successful, i.e. earlier than the existing contacts with these hosts?
-    successful <- whencontacts < inftimes[whocontacted]
+    successful <- whencontacts < inftimes[whocontacted] & whocontacted > intronr
     
     #change infectors and infection times of successful contactees
     sources[whocontacted[successful]] <- currentID
     inftimes[whocontacted[successful]] <- whencontacts[successful]
+    
     #go to next infected host in line
     nth.infection <- nth.infection + 1
     currentID <- order(inftimes)[nth.infection]
@@ -326,10 +306,7 @@ sim_outbreak_spatial <- function(Npop, R0, intro, aG, mG, aS, mS, dist.model, di
   
   ### determine outbreaksize and sampling times
   obs <- sum(inftimes<10000)
-  if (intro > 1)
-    samtimes <- c(0,inftimes[-1] + rgamma(Npop, aS, aS/mS))
-  else 
-    samtimes <- inftimes + rgamma(Npop+1, aS, aS/mS)
+  samtimes <- inftimes + rgamma(Npop, aS, aS/mS)
   
   ### order hosts by sampling times, and renumber hostIDs
   ### so that the uninfected hosts can be discarded
@@ -339,33 +316,18 @@ sim_outbreak_spatial <- function(Npop, R0, intro, aG, mG, aS, mS, dist.model, di
   infectors[is.na(infectors)] <- 0
   inftimes <- inftimes[orderbysamtimes]
   samtimes <- samtimes[orderbysamtimes]
-  locations <- cbind(x, y)[orderbysamtimes[-1]-1, ]
+  locations <- cbind(x, y)[orderbysamtimes, ]
 
   ### return the outbreak
-  if(intro > 1){
-    inftimes <- inftimes - min(inftimes[-1])
-    samtimes <- samtimes + inftimes[1]
-    
-    return(
-      list(
-        obs = obs-1,
-        samtimes = samtimes[2:obs],
-        inftimes = inftimes[2:obs],
-        infectors = infectors,
-        locations = locations[2:obs, ]
-      )
+  return(
+    list(
+      obs = obs,
+      samtimes = samtimes[1:obs],
+      inftimes = inftimes[1:obs],
+      infectors = infectors,
+      locations = locations[1:obs, ]
     )
-  } else {
-    return(
-      list(
-        obs = obs,
-        samtimes = samtimes[1:obs],
-        inftimes = inftimes[1:obs],
-        infectors = infectors,
-        locations = locations[1:obs, ]
-      )
-    )
-  }
+  )
 }
 
 
@@ -467,114 +429,6 @@ sim_sequences <- function (sim.object, mu, sequence.length) {
   }
   )
 }
-
-### merge simulated trees together in one list
-merge_trees <- function(sim.object) {
-  obs <- sum(unlist(lapply(sim.object, function(xx) return(xx$obs))))
-  Nsamples <- sum(unlist(lapply(sim.object, function(xx) return(xx$Nsamples))))
-  
-  sample.data <- do.call(rbind, lapply(sim.object, function(xx){
-    return(data.frame("samtimes"=xx$samtimes,
-                      "inftimes"=xx$inftimes,
-                      "old"=1:length(xx$inftimes)))
-  }))
-  sample.data$tree <- unlist(lapply(seq_along(sim.object), function(i)
-    return(rep(i, length(sim.object[[i]]$inftimes)))))
-  merged <- order(sample.data$samtimes)
-  sample.data <- sample.data[merged,]
-  sample.data$merged <- merged
-  sample.data$new <- 1:obs
-  sample.data$infectors <- unlist(lapply(seq_along(sim.object), function(i) {
-    inf <- sim.object[[i]]$infectors
-    inf <- unlist(sapply(inf, function(xx){
-      if (xx==0) return(0)
-      return(sample.data$new[sample.data$tree==i & sample.data$old == xx])
-    }))
-    return(inf)
-  }))[sample.data$merged]
-  
-  addsample.data <- do.call(rbind,lapply(seq_along(sim.object), function(i){
-    hosts <- sim.object[[i]]$addsamplehosts
-    hosts <- unlist(sapply(hosts, function(xx){
-      if (xx==0) return(0)
-      return(sample.data$new[sample.data$tree==i & sample.data$old == xx])
-    }))
-    return(data.frame("times"=sim.object[[i]]$addsampletimes,
-                      "hosts"=hosts))
-  }))
-  if (length(addsample.data$times)!=0){
-    addsample.data <- addsample.data[order(addsample.data$hosts),]
-  } else {
-    addsample.data <- list("times" = numeric(0),
-                           "hosts" = integer(0))
-  }
-  
-  nodehosts <- unlist(lapply(seq_along(sim.object), function(i) {
-    host <- sim.object[[i]]$nodehosts
-    host <- unlist(sapply(host, function(xx){
-      if (xx==0) return(0)
-      return(sample.data$new[sample.data$tree==i & sample.data$old == xx])
-    }))
-    return(host)
-  }))
-  
-  node.data <- do.call(rbind, lapply(sim.object, function(xx) 
-    return(data.frame("times"=xx$nodetimes, 
-                      "type"=factor(xx$nodetypes,levels=c("s","x","c","t")),
-                      "old"=1:length(xx$nodetypes)))))
-  tree <- c()
-  for (i in seq_along(sim.object)){
-    tree <- c(tree, rep(i, length(sim.object[[i]]$nodetypes)))
-  }
-  node.data$tree <- tree
-  node.data$hosts <- nodehosts
-  node.order <- order(node.data$type, node.data$hosts, node.data$times)
-  node.data <- node.data[node.order,]
-  node.data$merged <- node.order
-  node.data$new <- 1:nrow(node.data)
-  node.data$parent <- unlist(lapply(seq_along(sim.object), function(i){
-    xx <- sim.object[[i]]
-    parent <- c()
-    for (j in 1:length(xx$nodeparents)){
-      newparent <- node.data$new[node.data$tree==i & node.data$old == xx$nodeparents[j]]
-      if (length(newparent)==0) parent <- c(parent, 0)
-      else parent <- c(parent,newparent)
-    }
-    return(parent)
-  }))[node.order]
-  
-  sequences <- do.call(cbind,lapply(sim.object, function(xx) return(as.data.frame(xx$sequences))))
-  seq.data <- do.call(rbind,lapply(sim.object, function(xx) 
-    return(data.frame("times"=xx$nodetimes,
-                      "type"=xx$nodetypes))))
-  seq.data <- seq.data[seq.data$type == "s" | seq.data$type == "x",]
-  seq.order <- order(seq.data$type,seq.data$times)
-  sequences <- sequences[,seq.order,drop=FALSE]
-  colnames(sequences) <- 1:ncol(sequences)
-  if (Nsamples == 1){
-    sequences <- cbind(sequences, sequences)
-    colnames(sequences) <- 1:2
-    
-    sequences <- as.phyDat(sequences)
-    sequences <- subset(sequences, subset = 1)
-  } else {
-    sequences <- as.phyDat(sequences)
-  }
-  
-  return(list("obs"=obs,
-              "infectors"=sample.data$infectors,
-              "inftimes"=sample.data$inftimes,
-              "samtimes"=sample.data$samtimes,
-              "addsampletimes"=addsample.data$times,
-              "addsamplehosts"=addsample.data$hosts,
-              "Nsamples"=Nsamples,
-              "nodeparents"=node.data$parent,
-              "nodetimes"=node.data$times,
-              "nodehosts"=node.data$hosts,
-              "nodetypes"=as.character(node.data$type),
-              "sequences"=sequences))
-}
-
 
 nthsample <- function(sim.object) {
   with(sim.object, {

@@ -167,7 +167,7 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, sample.names =
   ### spatial data ###
   if(!is.null(spatial)) {
     if(inherits(spatial, "dist")) {
-      distances <- as.matrix(distances)
+      distances <- as.matrix(spatial)
     } else {
       if(inherits(spatial, "data.frame")) spatial <- as.matrix(spatial)
       if(!inherits(spatial, "matrix") || !is.numeric(spatial)) {
@@ -230,8 +230,10 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, sample.names =
         colnames(spatial) <- c("x", "y")
       }
     }
-    if(all(rownames(spatial) == colnames(spatial))) {
-      res <- c(res, list(distances = spatial[orderedhosts, orderedhosts]))
+    if(nrow(spatial) == ncol(spatial)){
+      if (all(rownames(spatial) == colnames(spatial))) {
+        res <- c(res, list(distances = spatial[orderedhosts, orderedhosts]))
+      }
     } else if(all(colnames(spatial) %in% c("lon", "lat"))) {
       distances <- sp::spDists(as.matrix(spatial[, c("lon", "lat")]), longlat = TRUE)
       colnames(distances) <- rownames(distances) <- rownames(spatial)
