@@ -51,6 +51,17 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
     } 
   }
   
+  if(historydist > 0 && !x$p$mult.intro) {
+    x$p$mult.intro <- TRUE
+    warning("historydist > 0, p$mult.intro set to TRUE")
+  }
+  if (is.null(heats))
+    heats <- 1/(1+1*(1:nchains-1))
+  else if (inherits(heats, "numeric") & length(heats) != nchains)
+    stop("length of heats is not the same as number of chains")
+  else if (!inherits(heats, "numeric"))
+    stop("heats is not a numeric vector")
+  
   ### add distance model if not present
   if(is.null(x$p$dist.model)) {
     x$p$dist.model <- "none"
@@ -69,14 +80,7 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
   historydistribution <- c(historydist, 1 - historydist)
   
   build_pbe(x)
-  
-  if (is.null(heats))
-    heats <- 1/(1+1*(1:nchains-1))
-  else if (inherits(heats, "numeric") & length(heats) != nchains)
-    stop("length of heats is not the same as number of chains")
-  else if (!inherits(heats, "numeric"))
-    stop("heats is not a numeric vector")
-  
+
   envirs <- list()
   
   for (n in 1:nchains){
@@ -111,7 +115,7 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
     envirs <- lapply(envirs, function(e) {
       for (i in ls(envir = e)) copy2pbe0(i,e)
         
-      for(i in sample(c(rep(-(1:13), parameter_frequency), 0:x$p$obs))) {
+      for(i in sample(c(rep(-(1:10), parameter_frequency), 0:x$p$obs))) {
         if(i >= 0) {
           which_protocol <- sample(c("edgewise", "classic", "keepphylo", "withinhost"),
                                    1,
@@ -127,15 +131,16 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
         if (i == -1 && x$h$est.mu)  update_mu()
         if (i == -2 && x$h$est.mG)  update_mG()
         if (i == -3 && x$h$est.mS)  update_mS()
-        if (i == -11 && x$h$est.tG) update_tG()
-        if (i == -12 && x$h$est.tS) update_tS()
-        if (i == -10 && x$h$est.hist.m) update_hist_mean()
         if (i == -4 && x$h$est.wh.s)  update_wh_slope()
         if (i == -5 && x$h$est.wh.e)  update_wh_exponent()
         if (i == -6 && x$h$est.wh.0)  update_wh_level()
         if (i == -7 && x$h$est.dist.e)  update_dist_exponent()
         if (i == -8 && x$h$est.dist.s)  update_dist_scale()
         if (i == -9 && x$h$est.dist.m)  update_dist_mean()
+        if (i == -10 && x$h$est.hist.m) update_ir()
+        #if (i == -11 && x$h$est.tG) update_tG()
+        #if (i == -12 && x$h$est.tS) update_tS()
+        
       }
       
       as.environment(as.list(pbe0, all.names = TRUE))

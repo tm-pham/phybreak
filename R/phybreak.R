@@ -154,7 +154,7 @@ phybreak <- function(dataset, times = NULL,
   if(!multiple.introductions) {
     intro.rate <- 1
     est.intro.rate <- FALSE
-    }
+  }
   testargumentsclass_phybreak(environment())
   wh.model <- choose_whmodel(wh.model)
   wh.bottleneck <- choose_whbottleneck(wh.bottleneck, wh.model)

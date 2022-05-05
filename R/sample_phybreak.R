@@ -39,9 +39,9 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
                             nchains = 1, heats = NULL, all_chains = FALSE, parallel = FALSE, ...) {
   
   if (parallel)
-    return(sample_phybreak_parallel(x, nsample, thin, thinswap, classic, keepphylo, 
-                                    withinhost_only, parameter_frequency, status_interval, 
-                                    histtime, history, nchains, heats, all_chains))
+    return(sample_phybreak_parallel(x, nsample, thin, thinswap, classic, keepphylo, withinhost_only, 
+                                    parameter_frequency, status_interval, 
+                                    verbose, historydist, nchains, heats, all_chains)) 
       
   ### tests
   if(nsample < 1) stop("nsample should be positive")
@@ -58,6 +58,10 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       keepphylo <- 0
       warning("model incompatible with keepphylo-updates: they will not be used", immediate. = TRUE)
     } 
+  }
+  if(historydist > 0 && !x$p$mult.intro) {
+    x$p$mult.intro <- TRUE
+    warning("historydist > 0, p$mult.intro set to TRUE")
   }
   if (is.null(heats))
     heats <- 1/(1+1*(1:nchains-1))
@@ -170,16 +174,18 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
           if (i == -1 && x$h$est.mu)  update_mu()
           if (i == -2 && x$h$est.mG)  update_mG()
           if (i == -3 && x$h$est.mS)  update_mS()
-          if (i == -11 && x$h$est.tG) update_tG()
-          if (i == -12 && x$h$est.tS) update_tS()
-          if (i == -13 && x$h$est.ir) update_ir()
-          if (i == -10 && x$h$est.wh.h) update_wh_history()
           if (i == -4 && x$h$est.wh.s)  update_wh_slope()
           if (i == -5 && x$h$est.wh.e)  update_wh_exponent()
           if (i == -6 && x$h$est.wh.0)  update_wh_level()
-          if (i == -7 && x$h$est.dist.e)  update_dist_exponent()
-          if (i == -8 && x$h$est.dist.s)  update_dist_scale()
-          if (i == -9 && x$h$est.dist.m)  update_dist_mean()
+          if (i == -7 && x$h$est.wh.h) update_wh_history()
+          if (i == -8 && x$h$est.dist.e)  update_dist_exponent()
+          if (i == -9 && x$h$est.dist.s)  update_dist_scale()
+          if (i == -10 && x$h$est.dist.m)  update_dist_mean()
+          if (i == -11 && x$h$est.ir) update_ir()
+          # if (i == -12 && x$h$est.tG) update_tG()
+          # if (i == -13 && x$h$est.tS) update_tS()
+          
+          
         }
         
         as.environment(as.list(pbe0, all.names = TRUE))
@@ -214,8 +220,8 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       s.post$hist.mean[sa] <- pbe0$p$hist.mean
       s.post$mG[sa] <- pbe0$p$gen.mean
       s.post$mS[sa] <- pbe0$p$sample.mean
-      s.post$tG[sa] <- pbe0$p$trans.growth
-      s.post$tS[sa] <- pbe0$p$trans.sample
+      #s.post$tG[sa] <- pbe0$p$trans.growth
+      #s.post$tS[sa] <- pbe0$p$trans.sample
       s.post$ir[sa] <- pbe0$p$intro.rate
       s.post$wh.h[sa] <- pbe0$p$wh.history
       s.post$wh.s[sa] <- pbe0$p$wh.slope

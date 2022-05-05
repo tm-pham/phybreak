@@ -141,6 +141,7 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, sample.names =
   sequences <- matrix(sapply(sequences, tolower), nrow = nrow(sequences))
   sample.times <- sample.times[outputordersamples]
   sample.names <- sample.names[outputordersamples]
+  host.names <- host.names[outputordersamples]
 
   #################################################
   ### place essential information in outputlist ###

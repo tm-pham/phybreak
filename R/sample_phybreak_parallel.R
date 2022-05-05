@@ -34,12 +34,8 @@
 #' MCMCstate <- sample_phybreak(MCMCstate, nsample = 50, thin = 2)
 #' @export
 sample_phybreak_parallel <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, keepphylo = 0, withinhost_only = 0, 
-                            parameter_frequency = 1, status_interval = 10,
-                            histtime = -1e5, history = FALSE,
-                            nchains = 1, heats = NULL, all_chains = FALSE, 
-                            boost.mcmc = FALSE, outfile = "") {
-  
-  print(boost.mcmc)
+                                     parameter_frequency = 1, status_interval = 10, verbose = 1, historydist = 0.5,
+                                     nchains = 1, heats = NULL, all_chains = FALSE, outfile = "", report = 100) {
   
   if(!("parallel" %in% .packages(TRUE))) {
     stop("package 'parallel' should be installed for this function")
@@ -72,9 +68,8 @@ sample_phybreak_parallel <- function(x, nsample, thin = 1, thinswap = 1, classic
     } 
   }
   if(nchains==1){
-   return(sample_phybreak(x, nsample, thin = 1, thinswap = 1, classic = 0, keepphylo = 0, withinhost_only = 0, 
-                          parameter_frequency = 1, status_interval = 10,
-                          histtime = -1e5, history = FALSE))
+    return(sample_phybreak(x, nsample, thin, thinswap, classic, keepphylo, withinhost_only, 
+                           parameter_frequency, status_interval))
   }
   
   ### add distance model if not present
@@ -91,34 +86,27 @@ sample_phybreak_parallel <- function(x, nsample, thin = 1, thinswap = 1, classic
     x$h$est.dist.m <- FALSE
   }
   
-  protocoldistribution <- c(1 - classic - keepphylo - withinhost_only, classic, keepphylo, withinhost_only)
-  
   ### create room in s to add the new posterior samples
   s.post <- list(inftimes = with(x, cbind(s$inftimes, matrix(NA, nrow = p$obs, ncol = nsample))),
                  infectors = with(x, cbind(s$infectors, matrix(NA, nrow = p$obs, ncol = nsample))),
                  nodetimes = with(x, cbind(s$nodetimes, matrix(NA, nrow = d$nsamples - 1, ncol = nsample))), 
                  nodehosts = with(x, cbind(s$nodehosts, matrix(NA, nrow = d$nsamples - 1, ncol = nsample))), 
                  nodeparents = with(x, cbind(s$nodeparents, matrix(NA, nrow = 2 * d$nsamples - 1, ncol = nsample))),
-                 histnodetimes = with(x, cbind(s$histnodetimes, matrix(NA, nrow = 3*d$nsamples , ncol = nsample))),
-                 histnodeparents = with(x, cbind(s$histnodeparents, matrix(NA, nrow = 3*d$nsamples , ncol = nsample))),
-                 histnodehosts = with(x, cbind(s$histnodehosts, matrix(NA, nrow = 3*d$nsamples , ncol = nsample))),
                  introductions = c(x$s$introductions, rep(NA, nsample)),
                  mu = c(x$s$mu, rep(NA, nsample)), 
-                 hist_dens = c(x$s$hist_dens, rep(NA, nsample)),
-                 hist.mean = c(x$s$hist.mean, rep(NA, nsample)),
                  mG = c(x$s$mG, rep(NA, nsample)), 
                  mS = c(x$s$mS, rep(NA, nsample)), 
                  tG = c(x$s$tG, rep(NA, nsample)),
                  tS = c(x$s$tS, rep(NA, nsample)),
-                 wh.h = c(x$s$wh.h, rep(NA, nsample)), 
+                 ir = c(x$s$ir, rep(NA, nsample)),
                  wh.s = c(x$s$wh.s, rep(NA, nsample)), 
                  wh.e = c(x$s$wh.e, rep(NA, nsample)), 
                  wh.0 = c(x$s$wh.0, rep(NA, nsample)), 
+                 wh.h = c(x$s$wh.h, rep(NA, nsample)), 
                  dist.e = c(x$s$dist.e, rep(NA, nsample)), 
                  dist.s = c(x$s$dist.s, rep(NA, nsample)), 
                  dist.m = c(x$s$dist.m, rep(NA, nsample)), 
                  logLik = c(x$s$logLik, rep(NA, nsample)),
-                 historyinf = c(x$s$historyinf, rep(NA, nsample)),
                  heat = c(x$s$heat, rep(NA, nsample)))
   
   ### Set heats for MC3, heats = 1 if there is one chain
@@ -144,9 +132,10 @@ sample_phybreak_parallel <- function(x, nsample, thin = 1, thinswap = 1, classic
   mgrmakevar(cl, "shared_lik", 1, nchains)
   
   ### Export variables and functions
-  clusterExport(cl, varlist = c("x", "nsample", "nswaps", "thin", "thinswap", "protocoldistribution",
-                                "s.post", "status_interval", "parameter_frequency","histtime",
-                                "history", "boost.mcmc"), 
+  clusterExport(cl, varlist = c("x", "nsample", "nswaps", "thin", "thinswap",
+                                "classic", "keepphylo", "withinhost_only",
+                                "status_interval", "parameter_frequency", 
+                                "historydist", "report"),
                 envir = environment())
   
   if (outfile != "")
@@ -158,40 +147,42 @@ sample_phybreak_parallel <- function(x, nsample, thin = 1, thinswap = 1, classic
     me <- myinfo$id
     if (nswaps == 1) { 
       if(me == 1)
-        return(sample_phybreak(x, nsample = thinswap, heats=shared_heats[1,me],
-                               history = history, histtime = histtime, keep_history = FALSE, boost.mcmc = boost.mcmc))
+        return(sample_phybreak(x, nsample = thinswap, thin, thinswap, classic, keepphylo, withinhost_only, 
+                               parameter_frequency, status_interval, verbose = 1, historydist,
+                               heats=shared_heats[1,me]))
       else
-        return(sample_phybreak(x, nsample = thinswap, heats=shared_heats[1,me],
-                               history = history, histtime = histtime, keep_history = FALSE, 
-                               verbose = 0, boost.mcmc = boost.mcmc))
+        return(sample_phybreak(x, nsample = thinswap, thin, thinswap, classic, keepphylo, withinhost_only, 
+                               parameter_frequency, status_interval, verbose = 0, historydist,
+                               heats=shared_heats[1,me]))
     } else {
-      if (me == 1)
-        s <- sample_phybreak(x, nsample = thinswap, heats=shared_heats[1,me],
-                             history = history, histtime = histtime, keep_history = TRUE, boost.mcmc = boost.mcmc)
+      if (me == 1){
+        s <- sample_phybreak(x, nsample = thinswap, thin, thinswap, classic, keepphylo, withinhost_only, 
+                             parameter_frequency, status_interval, verbose = 1, historydist,
+                             nchains = 1, heats=shared_heats[1,me])}
       else
-        s <- sample_phybreak(x, nsample = thinswap, heats=shared_heats[1,me],
-                             history = history, histtime = histtime, keep_history = TRUE, 
-                             verbose = 0, boost.mcmc = boost.mcmc)
+        s <- sample_phybreak(x, nsample = thinswap, thin, thinswap, classic, keepphylo, withinhost_only, 
+                             parameter_frequency, status_interval, verbose = 0, historydist,
+                             heats=shared_heats[1,me])
     }
     if (nswaps == 2) {
-      return(sample_phybreak(s, nsample = thinswap, heats=shared_heats[1,me],
-                             history = TRUE, histtime = histtime, 
-                             verbose = 0, boost.mcmc = boost.mcmc))
+      return(sample_phybreak(s, nsample = thinswap, thin, thinswap, classic, keepphylo, withinhost_only, 
+                             parameter_frequency, status_interval, verbose = 0, historydist,
+                             heats=shared_heats[1,me]))
     } else {
       for (i in 2:(nswaps-1)){
         if (shared_heats[1,me] == 1){
-          if(i %% 100 == 0)
-            s <- sample_phybreak(s, nsample = thinswap, heats=shared_heats[1,me],
-                                history = TRUE, histtime = histtime, keep_history = TRUE, 
-                                verbose = 2, boost.mcmc = boost.mcmc)
+          if(i %% report == 0)
+            s <- sample_phybreak(s, nsample = thinswap, thin, thinswap, classic, keepphylo, withinhost_only, 
+                                 parameter_frequency, status_interval, verbose = 2, historydist,
+                                 heats=shared_heats[1,me])
           else 
-            s <- sample_phybreak(s, nsample = thinswap, heats=shared_heats[1,me],
-                                 history = TRUE, histtime = histtime, keep_history = TRUE, 
-                                 verbose = 0, boost.mcmc = boost.mcmc)
+            s <- sample_phybreak(s, nsample = thinswap, thin, thinswap, classic, keepphylo, withinhost_only, 
+                                 parameter_frequency, status_interval, verbose = 0, historydist,
+                                 heats=shared_heats[1,me])
         } else {
-          s <- sample_phybreak(s, nsample = thinswap, heats=shared_heats[1,me],
-                               history = TRUE, histtime = histtime, keep_history = TRUE, 
-                               verbose = 0, boost.mcmc = boost.mcmc)
+          s <- sample_phybreak(s, nsample = thinswap, thin, thinswap, classic, keepphylo, withinhost_only, 
+                               parameter_frequency, status_interval, verbose = 0, historydist,
+                               heats=shared_heats[1,me])
         }
       
         shared_lik[1, me] <- s$s$logLik[length(s$s$logLik)]
@@ -203,8 +194,9 @@ sample_phybreak_parallel <- function(x, nsample, thin = 1, thinswap = 1, classic
         barr()
       }
       
-      s <- sample_phybreak(s, nsample = thinswap, heats=shared_heats[1,me],
-                           history = TRUE, verbose = 0)
+      s <- sample_phybreak(s, nsample = thinswap, thin, thinswap, classic, keepphylo, withinhost_only, 
+                           parameter_frequency, status_interval, verbose = 2, historydist,
+                           heats=shared_heats[1,me])
       
       print(warnings())
       return(s)

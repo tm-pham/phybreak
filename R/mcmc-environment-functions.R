@@ -114,8 +114,6 @@ build_pbe <- function(phybreak.obj) {
   logLikcoal <- lik_coaltimes(le)
   logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean, 
                               v$infectors, d$distances)
-  # logLikintro <- lik_introductions(p$hist.mean, sum(v$infectors == 0), 
-  #                                  max(d$sample.times) - min(v$inftimes))
   
   ### copy everything into pbe0
   copy2pbe0("d", le)
@@ -129,7 +127,6 @@ build_pbe <- function(phybreak.obj) {
   copy2pbe0("logLikgen", le)
   copy2pbe0("logLikdist", le)
   copy2pbe0("logLikcoal", le)
-  # copy2pbe0("logLikintro", le)
 }
 
 
