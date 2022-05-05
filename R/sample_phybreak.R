@@ -41,7 +41,7 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
   if (parallel)
     return(sample_phybreak_parallel(x, nsample, thin, thinswap, classic, keepphylo, withinhost_only, 
                                     parameter_frequency, status_interval, 
-                                    verbose, historydist, nchains, heats, all_chains)) 
+                                    verbose, historydist, nchains, heats, all_chains, ...)) 
       
   ### tests
   if(nsample < 1) stop("nsample should be positive")
@@ -59,9 +59,8 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       warning("model incompatible with keepphylo-updates: they will not be used", immediate. = TRUE)
     } 
   }
-  if(historydist > 0 && !x$p$mult.intro) {
-    x$p$mult.intro <- TRUE
-    warning("historydist > 0, p$mult.intro set to TRUE")
+  if(!x$p$mult.intro & historydist > 0) {
+    historydist <- 0
   }
   if (is.null(heats))
     heats <- 1/(1+1*(1:nchains-1))

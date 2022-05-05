@@ -226,6 +226,7 @@ sample_phybreak_parallel <- function(x, nsample, thin = 1, thinswap = 1, classic
     for (chain in 1:nchains){
       smp <- which(posts[[chain]]$s$heat == heats[nheat])
       for (n in names(s)){
+        print(n)
         if(inherits(s[[n]], "matrix"))
           s[[n]][,smp] <- posts[[chain]]$s[[n]][,smp]
         else

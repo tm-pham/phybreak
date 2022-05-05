@@ -51,9 +51,8 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
     } 
   }
   
-  if(historydist > 0 && !x$p$mult.intro) {
-    x$p$mult.intro <- TRUE
-    warning("historydist > 0, p$mult.intro set to TRUE")
+  if(!x$p$mult.intro & historydist > 0) {
+    historydist <- 0
   }
   if (is.null(heats))
     heats <- 1/(1+1*(1:nchains-1))
@@ -137,7 +136,7 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
         if (i == -7 && x$h$est.dist.e)  update_dist_exponent()
         if (i == -8 && x$h$est.dist.s)  update_dist_scale()
         if (i == -9 && x$h$est.dist.m)  update_dist_mean()
-        if (i == -10 && x$h$est.hist.m) update_ir()
+        if (i == -10 && x$h$est.ir) update_ir()
         #if (i == -11 && x$h$est.tG) update_tG()
         #if (i == -12 && x$h$est.tS) update_tS()
         
