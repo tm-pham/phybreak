@@ -108,8 +108,6 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
                  mu = c(x$s$mu, rep(NA, nsample)), 
                  mG = c(x$s$mG, rep(NA, nsample)), 
                  mS = c(x$s$mS, rep(NA, nsample)), 
-                 tG = c(x$s$tG, rep(NA, nsample)),
-                 tS = c(x$s$tS, rep(NA, nsample)),
                  ir = c(x$s$ir, rep(NA, nsample)),
                  wh.s = c(x$s$wh.s, rep(NA, nsample)), 
                  wh.e = c(x$s$wh.e, rep(NA, nsample)), 
@@ -120,6 +118,11 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
                  dist.m = c(x$s$dist.m, rep(NA, nsample)), 
                  logLik = c(x$s$logLik, rep(NA, nsample)),
                  heat = c(x$s$heat, rep(NA, nsample)))
+  
+  for (n in names(userenv$samplers)){
+    s.post <- c(s.post, list(c(x$s[[n]], rep(NA, nsample))))
+    names(s.post)[length(s.post)] <- n
+  }
     
   s.posts <- lapply(1:nchains, function(i) s.post)
     
@@ -181,8 +184,11 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
           if (i == -9 && x$h$est.dist.s)  update_dist_scale()
           if (i == -10 && x$h$est.dist.m)  update_dist_mean()
           if (i == -11 && x$h$est.ir) update_ir()
-          # if (i == -12 && x$h$est.tG) update_tG()
-          # if (i == -13 && x$h$est.tS) update_tS()
+          if (i < -11){
+            if (userenv$helpers[[-11 - i]]) {
+              userenv$updaters[[-11 - i]]()
+            }
+          }
           
           
         }
@@ -232,6 +238,10 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       s.post$logLik[sa] <- sum(pbe0$logLikcoal, pbe0$logLikgen, pbe0$logLiksam, 
                                pbe0$logLikdist, pbe0$logLikintro, pbe0$logLikseq) 
       s.post$heat[sa] <- pbe0$heat
+      
+      for (i in 1:length(userenv$samplers)){
+        s.post[[names(userenv$samplers)[i]]][sa] <- tail(pbe0$p, length(userenv$samplers))[i][[1]] 
+      }
       
       s.posts[[chain]] <- s.post
       

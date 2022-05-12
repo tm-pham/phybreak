@@ -114,7 +114,7 @@
 #' @export
 phybreak <- function(dataset, times = NULL, 
          mu = NULL, gen.shape = 3, gen.mean = 1, trans.model = "gamma",
-         trans.init = 1e-4, trans.growth = 1, trans.sample = 0.1, trans.culling = 5,
+         infectivity_file = NULL,
          sample.shape = 3, sample.mean = 1, 
          multiple.introductions = FALSE, introductions = 1, intro.rate = 1,
          wh.model = "linear", wh.bottleneck = "auto", wh.history = 1, wh.slope = 1, wh.exponent = 1, wh.level = 0.1,
@@ -159,7 +159,23 @@ phybreak <- function(dataset, times = NULL,
   wh.model <- choose_whmodel(wh.model)
   wh.bottleneck <- choose_whbottleneck(wh.bottleneck, wh.model)
   dist.model <- choose_distmodel(dist.model, dataset$distances)
-
+  trans.model <- choose_transmodel(trans.model)
+  
+  ####################################
+  ### Load user-defined infectivity ###
+  ####################################
+  if(trans.model == "user-defined") {
+    if(is.null(infectivity_file))
+      stop("Please provide a R file stating the infectivity function")
+    else 
+      source(infectivity_file, local = userenv)
+  } else {
+    datas <- NULL
+    parameters <- NULL
+    helpers <- NULL
+    samplers <- NULL
+  }
+  
   ### outbreak parameters ###
   
   ########################
@@ -172,7 +188,6 @@ phybreak <- function(dataset, times = NULL,
   dataslot$hostnames <- dataset$sample.hosts
   dataslot$sequences <- dataset$sequences
   dataslot$sample.times <- dataset$sample.times
-  dataslot$culling.times <- dataset$culling.times
   dataslot$locations <- dataset$locations
   dataslot$distances <- dataset$distances
   
@@ -190,6 +205,14 @@ phybreak <- function(dataset, times = NULL,
   #Sample size
   dataslot$nsamples <- length(dataslot$names)
   
+  #Add data for user-defined function
+  dataslot <- c(dataslot, 
+                as.list(userenv)[setdiff(names(userenv), 
+                                         c("parameters", 
+                                           "helpers", 
+                                           "samplers", 
+                                           "infect_function"))])
+  
   ##############################
   ### third slot: parameters ###
   ##############################
@@ -200,10 +223,7 @@ phybreak <- function(dataset, times = NULL,
     gen.mean = gen.mean,
     sample.shape = sample.shape,
     gen.shape = gen.shape,
-    trans.init = trans.init,
-    trans.growth = trans.growth,
-    trans.sample = trans.sample,
-    trans.culling = trans.culling,
+    trans.model = trans.model,
     intro.rate = intro.rate,
     wh.model = wh.model,
     wh.bottleneck = wh.bottleneck,
@@ -215,9 +235,9 @@ phybreak <- function(dataset, times = NULL,
     dist.exponent = dist.exponent,
     dist.scale = dist.scale,
     dist.mean = dist.mean,
-    trans.model = trans.model,
     mult.intro = multiple.introductions
   )
+  parameterslot <- c(parameterslot, userenv$parameters)
   
   ##############################
   ### second slot: variables ###
@@ -250,8 +270,6 @@ phybreak <- function(dataset, times = NULL,
                      est.mu = est.mu,
                      est.mG = est.gen.mean,
                      est.mS = est.sample.mean,
-                     est.tG = est.trans.growth,
-                     est.tS = est.trans.sample,
                      est.ir = est.intro.rate,
                      est.wh.s = est.wh.slope && wh.model == "linear",
                      est.wh.e = est.wh.exponent && wh.model == "exponential",
@@ -265,9 +283,9 @@ phybreak <- function(dataset, times = NULL,
                      mG.av = prior.gen.mean.mean,
                      mG.sd = prior.gen.mean.sd,
                      mS.av = prior.sample.mean.mean,
+                     mS.sd = prior.sample.mean.sd,
                      ir.av = prior.intro.rate.mean,
                      ir.sd = prior.intro.rate.sd,
-                     mS.sd = prior.sample.mean.sd,
                      wh.s.sh = prior.wh.slope.shape,
                      wh.s.av = prior.wh.slope.mean,
                      wh.e.sh = prior.wh.exponent.shape,
@@ -281,7 +299,10 @@ phybreak <- function(dataset, times = NULL,
                      dist.s.sh = prior.dist.scale.shape,
                      dist.s.av = prior.dist.scale.mean,
                      dist.m.sh = prior.dist.mean.shape,
-                     dist.m.av = prior.dist.mean.mean)
+                     dist.m.av = prior.dist.mean.mean,
+                     inf.file = infectivity_file)
+  
+  helperslot <- c(helperslot, userenv$helpers)
   
   ###########################
   ### fifth slot: samples ###
@@ -296,8 +317,6 @@ phybreak <- function(dataset, times = NULL,
     mu = c(),
     mG = c(),
     mS = c(),
-    tG = c(),
-    tS = c(),
     ir = c(),
     wh.s = c(),
     wh.e = c(),
@@ -309,6 +328,10 @@ phybreak <- function(dataset, times = NULL,
     logLik = c(),
     heat = c()
   )
+  
+  sampleslot <- c(sampleslot, userenv$samplers)
+  
+  
 
   ################################
   ### make the phybreak object ###
@@ -462,6 +485,11 @@ choose_distmodel <- function(x, distances) {
   return(x)
 }
 
+### set transmission model from possible input values
+choose_transmodel <- function(x) {
+  tmoptions <- c("gamma", "user-defined")
+  return(match.arg(x, tmoptions))
+}
 
 ### pseudo-distance matrix between sequences given SNP data
 distmatrix_phybreak <- function(sequences) {

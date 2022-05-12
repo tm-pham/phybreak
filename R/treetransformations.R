@@ -158,10 +158,6 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
   ### extract and order samples
   refdate <- min(vars$sample.times)
   samtimes <- vars$sample.times - refdate
-  if(exists("culling.times", vars))
-    cultimes <- vars$culling.times - refdate
-  else 
-    cultimes <- NULL
   nsamples <- length(samtimes)
   if(exists("sample.hosts", vars)) {
     samhosts <- vars$sample.hosts
@@ -196,7 +192,6 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
     }
   }
   samtimes <- as.numeric(samtimes)
-  cultimes <- as.numeric(cultimes)
   samplenames <- names(samhosts)
   hostnames <- unique(samhosts)
   samhosts <- match(samhosts, hostnames)
@@ -207,7 +202,7 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
     resample <- TRUE
     inftimes <- .rinftimes(samtimes[1:nhosts], resamplepars$sample.mean, resamplepars$sample.shape)
     infectors <- .rinfectors(inftimes, introductions, p = resamplepars, 
-                             v = list(cultimes=cultimes, nodetimes = samtimes))
+                             v = list(nodetimes = samtimes))
   } else {
     inftimes <- as.numeric(vars$sim.infection.times - refdate)
     infectors <- match(vars$sim.infectors, hostnames)
@@ -221,7 +216,6 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
     res <- list(
       inftimes = inftimes,
       infectors = infectors,
-      cultimes = cultimes,
       nodetypes = c(rep("s", nhosts), rep("x", nsamples - nhosts), rep("c", nsamples - 1), rep("t", nhosts)),  
       #node type (primary sampling, extra sampling, coalescent)
       nodetimes = c(samtimes, samtimes[-1], inftimes),
@@ -379,10 +373,9 @@ whichgeneration <- function(infectors, hostID) {
   res <- rep(0, length(it))
   for(i in 1:length(it)) {
     if(it[i] > min(it)) {
-      dist <- infect_distribution(it[i], it, 
-                                  cultimes = v$cultimes,
+      dist <- infect_distribution(it[i], it,
                                   nodetimes = v$nodetimes[1:length(it)], 
-                                  p = p)
+                                  le = list(p=p))
       dist[i] <- 0
       res[i] <- sample(length(it), 1, prob = dist)
     }

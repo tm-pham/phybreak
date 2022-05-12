@@ -91,67 +91,6 @@ update_mG <- function() {
     accept_pbe("mG")
 }
 
-update_tG <- function() {
-  ### create an up-to-date proposal-environment
-  prepare_pbe()
-  
-  ### making variables and parameters available within the function
-  le <- environment()
-  d <- pbe0$d
-  h <- pbe0$h
-  p <- pbe1$p
-  v <- pbe1$v
-  
-  ### change to proposal state
-  sumgt <- sum(v$inftimes[v$infectors > 1] -
-                 v$inftimes[v$infectors[v$infectors>1]])
-  # thalf <- p$gen.shape/rgamma(1,
-  #                                  shape = p$gen.shape * (p$obs - 1) + 2 + (h$mG.av/h$mG.sd)^2,
-  #                                  rate = sumgt + (h$mG.av/p$gen.shape) * (1 + (h$mG.av/h$mG.sd)^2))
-  
-  #p$trans.growth <- max(0,rnorm(1, mean = log(sumgt)/1, sd = 0.1))#log((1-p$trans.init)/p$trans.init)/rexp(1, rate = 15/sumgt)
-  p$trans.growth <- exp(log(p$trans.growth) + rnorm(1, 0, 0.1))
-  ### update proposal environment
-  copy2pbe1("p", le)
-  ### calculate likelihood
-  propose_pbe("mG")
-  
-  ### calculate acceptance probability
-  logaccprob <- pbe1$logLikgen - pbe0$logLikgen
-  
-  ### accept
-  if (runif(1) < exp(logaccprob)) {
-    accept_pbe("mG")
-  }
-}
-
-update_tS <- function() {
-  ### create an up-to-date proposal-environment
-  prepare_pbe()
-  
-  ### making variables and parameters available within the function
-  le <- environment()
-  p <- pbe1$p
-  v <- pbe1$v
-  
-  p$trans.sample <- exp(log(p$trans.sample) + rnorm(1, 0, 0.1))
-  # 
-  
-  ### update proposal environment
-  copy2pbe1("p", le)
-  
-  ### calculate likelihood
-  propose_pbe("mG")
-  
-  ### calculate acceptance probability
-  logaccprob <- pbe1$logLikgen - pbe0$logLikgen
-  
-  ### accept
-  if (runif(1) < exp(logaccprob) & p$trans.sample <= 1) {
-    accept_pbe("mG")
-  }
-}
-
 update_ir <- function() {
   ### create an up-to-date proposal-environment
   prepare_pbe()

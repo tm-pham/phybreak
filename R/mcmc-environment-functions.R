@@ -18,7 +18,7 @@
 # The environments are used during MCMC-updating, and in sim_phybreak and phybreak to simulate the phylogenetic tree.
 pbe0 <- new.env()
 pbe1 <- new.env()
-pbe2 <- new.env()
+userenv <- new.env()
 
 # Copy functions to phybreak environments
 copy2pbe0 <- function(var, env) {
@@ -33,8 +33,8 @@ copy2pbe1 <- function(var, env) {
 copy2pbe1_2 <- function(var, env) {
   assign(var, get(var, env), pbe1_2)
 }
-copy2pbe2 <- function(var, env) {
-  assign(var, get(var, env), pbe2)
+copy2userenv <- function(var, env) {
+  assign(var, get(var, env), userenv)
 }
 
 ### build the pbe0 at the start of an mcmc chain by copying the fixed parameters and phybreak object, and by
@@ -110,7 +110,7 @@ build_pbe <- function(phybreak.obj) {
   
   ### calculate the other log-likelihoods
   logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes)
-  logLikgen <- lik_gentimes(p, v)
+  logLikgen <- lik_gentimes(le)
   logLikcoal <- lik_coaltimes(le)
   logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean, 
                               v$infectors, d$distances)
@@ -194,7 +194,7 @@ propose_pbe <- function(f) {
   }
   
   if (f == "phylotrans" || f == "trans" || f == "mG" || f == "ir") {
-    logLikgen <- lik_gentimes(p, v)
+    logLikgen <- lik_gentimes(le)
     copy2pbe1("logLikgen", le)
   }
   

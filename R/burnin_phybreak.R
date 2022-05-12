@@ -79,7 +79,13 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
   historydistribution <- c(historydist, 1 - historydist)
   
   build_pbe(x)
-
+  npars <- sum(sapply(names(x$h), function(n){
+    if(grepl("est", n)){
+      return(1)
+    } else 
+      return(0)
+  }))
+  
   envirs <- list()
   
   for (n in 1:nchains){
@@ -114,7 +120,7 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
     envirs <- lapply(envirs, function(e) {
       for (i in ls(envir = e)) copy2pbe0(i,e)
         
-      for(i in sample(c(rep(-(1:10), parameter_frequency), 0:x$p$obs))) {
+      for(i in sample(c(rep(-(1:npars), parameter_frequency), 0:x$p$obs))) {
         if(i >= 0) {
           which_protocol <- sample(c("edgewise", "classic", "keepphylo", "withinhost"),
                                    1,
@@ -133,12 +139,16 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
         if (i == -4 && x$h$est.wh.s)  update_wh_slope()
         if (i == -5 && x$h$est.wh.e)  update_wh_exponent()
         if (i == -6 && x$h$est.wh.0)  update_wh_level()
-        if (i == -7 && x$h$est.dist.e)  update_dist_exponent()
-        if (i == -8 && x$h$est.dist.s)  update_dist_scale()
-        if (i == -9 && x$h$est.dist.m)  update_dist_mean()
-        if (i == -10 && x$h$est.ir) update_ir()
-        #if (i == -11 && x$h$est.tG) update_tG()
-        #if (i == -12 && x$h$est.tS) update_tS()
+        if (i == -7 && x$h$est.wh.h)  update_wh_history()
+        if (i == -8 && x$h$est.dist.e)  update_dist_exponent()
+        if (i == -9 && x$h$est.dist.s)  update_dist_scale()
+        if (i == -10 && x$h$est.dist.m)  update_dist_mean()
+        if (i == -11 && x$h$est.ir) update_ir()
+        if (i < -11){
+          if (userenv$helpers[[-11 - i]]) {
+            userenv$updaters[[-11 - i]]()
+          }
+        }
         
       }
       
@@ -181,7 +191,6 @@ burnin.phybreak <- function(...) {
 }
 
 print_screen_log <- function(iteration) {
-  if(pbe0$p$trans.model == "gamma"){
     message(paste0(
       stringr::str_pad(iteration, 8),
       stringr::str_pad(round(sum(pbe0$logLikseq + pbe0$logLiksam + pbe0$logLikgen + pbe0$logLikcoal + pbe0$logLikdist), 2), 12),
@@ -191,15 +200,15 @@ print_screen_log <- function(iteration) {
       stringr::str_pad(signif(pbe0$p$sample.mean, 3), 10),
       stringr::str_pad(phangorn::parsimony(
         phybreak2phylo(environment2phybreak(pbe0$v)), pbe0$d$sequences), 10)))
-  } else if (pbe0$p$trans.model == "sampling+culling"){
-    message(paste0(
-      stringr::str_pad(iteration, 8),
-      stringr::str_pad(round(pbe0$logLikseq + pbe0$logLiksam + pbe0$logLikgen + pbe0$logLikcoal + pbe0$logLikdist, 2), 12),
-      stringr::str_pad(signif(sum(pbe0$v$infectors==0), 1), 15),
-      stringr::str_pad(signif(pbe0$p$mu, 3), 9),
-      stringr::str_pad(signif(log((1-pbe0$p$trans.init)/pbe0$p$trans.init)/pbe0$p$trans.growth, 3), 10),
-      stringr::str_pad(signif(pbe0$p$sample.mean, 3), 10),
-      stringr::str_pad(phangorn::parsimony(
-        phybreak2phylo(environment2phybreak(pbe0$v)), pbe0$d$sequences), 10)))
-  }
+  # } else if (pbe0$p$trans.model == "sampling+culling"){
+  #   message(paste0(
+  #     stringr::str_pad(iteration, 8),
+  #     stringr::str_pad(round(pbe0$logLikseq + pbe0$logLiksam + pbe0$logLikgen + pbe0$logLikcoal + pbe0$logLikdist, 2), 12),
+  #     stringr::str_pad(signif(sum(pbe0$v$infectors==0), 1), 15),
+  #     stringr::str_pad(signif(pbe0$p$mu, 3), 9),
+  #     stringr::str_pad(signif(log((1-pbe0$p$trans.init)/pbe0$p$trans.init)/pbe0$p$trans.growth, 3), 10),
+  #     stringr::str_pad(signif(pbe0$p$sample.mean, 3), 10),
+  #     stringr::str_pad(phangorn::parsimony(
+  #       phybreak2phylo(environment2phybreak(pbe0$v)), pbe0$d$sequences), 10)))
+  # }
 }
