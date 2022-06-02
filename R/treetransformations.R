@@ -375,7 +375,7 @@ whichgeneration <- function(infectors, hostID) {
     if(it[i] > min(it)) {
       dist <- infect_distribution(it[i], it,
                                   nodetimes = v$nodetimes[1:length(it)], 
-                                  le = list(p=p))
+                                  le = list(p=p, v=c(v, list(inftimes = it))))
       dist[i] <- 0
       res[i] <- sample(length(it), 1, prob = dist)
     }

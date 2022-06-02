@@ -45,7 +45,7 @@ logLik.phybreak <- function(object, genetic = TRUE, withinhost = TRUE, sampling 
                                       v$nodeparents, v$nodetimes, p$mu, d$nsamples))
   }
   if (generation) {
-    res <- res + with(object, lik_gentimes(p, v))
+    res <- res + with(object, lik_gentimes(list(p = p, v = v)))
   }
   if (sampling) {
     res <- res + with(object, lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes))

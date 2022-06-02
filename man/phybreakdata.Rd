@@ -11,6 +11,7 @@ phybreakdata(
   sample.names = NULL,
   host.names = sample.names,
   culling.times = NULL,
+  external.sequence = FALSE,
   sim.infection.times = NULL,
   sim.infectors = NULL,
   sim.tree = NULL

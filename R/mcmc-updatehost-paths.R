@@ -256,7 +256,7 @@ update_host_history <- function(hostID, which_protocol) {
     
     ### propose infector for hostID
     dens.infectorproposal <- infect_distribution(tinf.prop, 
-                                                 v$inftimes, list(p = p),
+                                                 v$inftimes, list(p = p, v = v),
                                                  nodetimes = v$nodetimes[v$nodetypes=="s"]) +
       (tinf.prop - v$inftimes > 0)/pbe0$h$dist[hostID, ]
     dens.infectorproposal[which(v$tree != v$tree[hostID])] <- 0
@@ -357,7 +357,7 @@ update_host_history <- function(hostID, which_protocol) {
     # so first identify the current infector
     infector.current.ID <- v$infectors[hostID]
     dens.infectorcurrent <- infect_distribution(v$inftimes[hostID], 
-                                                v$inftimes, list(p = p),
+                                                v$inftimes, list(p = p, v = v),
                                                 nodetimes = v$nodetimes[v$nodetypes=="s"]) +
       (v$inftimes[hostID] - v$inftimes > 0)/pbe0$h$dist[hostID, ]
     dens.infectorcurrent[which(v$tree != v$tree[hostID])] <- 0
@@ -400,7 +400,7 @@ update_host_history <- function(hostID, which_protocol) {
     ### identify the current infector and propose the new infector
     infector.current.ID <- v$infectors[hostID]
     dens.infectorproposal <- infect_distribution(tinf.prop, 
-                                                 v$inftimes, list(p = p),
+                                                 v$inftimes, list(p = p, v = v),
                                                  nodetimes = v$nodetimes[v$nodetypes=="s"]) +
       (tinf.prop - v$inftimes > 0)/pbe0$h$dist[hostID, ]
     
@@ -415,7 +415,7 @@ update_host_history <- function(hostID, which_protocol) {
     ### calculate proposal ratio 
     # the reverse proposal includes proposing an infector
     dens.infectorcurrent <- infect_distribution(v$inftimes[hostID], 
-                                                v$inftimes, list(p = p),
+                                                v$inftimes, list(p = p, v = v),
                                                 nodetimes = v$nodetimes[v$nodetypes=="s"]) +
       (v$inftimes[hostID] - v$inftimes > 0)/pbe0$h$dist[hostID, ]
 
@@ -509,7 +509,7 @@ update_host_history <- function(hostID, which_protocol) {
     if (infector.current.ID == 0) infector.current.ID <- p$obs+1
     
     dens.infectorproposal <- c(infect_distribution(tinf.prop, 
-                                                   v$inftimes, list(p = p),
+                                                   v$inftimes, list(p = p, v = v),
                                                    nodetimes = v$nodetimes[v$nodetypes=="s"]) +
                                  (tinf.prop - v$inftimes > 0)/pbe0$h$dist[hostID, ], 1)
     
@@ -523,7 +523,7 @@ update_host_history <- function(hostID, which_protocol) {
     ### calculate proposal ratio 
     # the reverse proposal includes proposing an infector
     dens.infectorcurrent <- c(infect_distribution(v$inftimes[hostID], 
-                                                  v$inftimes, list(p = p),
+                                                  v$inftimes, list(p = p, v = v),
                                                   nodetimes = v$nodetimes[v$nodetypes=="s"]) +
                                 (v$inftimes[hostID] - v$inftimes > 0)/pbe0$h$dist[hostID, ], 1)
     dens.infectorcurrent[hostID] <- 0

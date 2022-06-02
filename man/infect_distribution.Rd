@@ -7,9 +7,8 @@
 infect_distribution(
   time,
   inftimes,
-  p,
+  le,
   nodetimes = NULL,
-  cultimes = NULL,
   host = NULL,
   log = FALSE
 )
@@ -17,11 +16,11 @@ infect_distribution(
 \arguments{
 \item{time}{The proposed infection time of the current host}
 
-\item{p}{The list with parameters for the model.}
-
 \item{vars}{The list of variables describing the nodes in the tree. This list should 
 at least include the infection times of the hosts. For \code{p$trans.model = "sample+culling"}
 also nodetimes of the sample nodes and the culling times of the hosts are needed as input.}
+
+\item{p}{The list with parameters for the model.}
 }
 \value{
 The transmission probabilities of all hosts infected before the current host. For each host

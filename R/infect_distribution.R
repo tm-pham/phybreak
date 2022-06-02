@@ -17,18 +17,18 @@
 infect_distribution <- function(time, inftimes, le, 
                                 nodetimes = NULL,  
                                 host = NULL, log = FALSE){
-
+  
   ### Gamma distributed ####
   if(le$p$trans.model == "gamma") {
     if(log)
       return(dgamma(time - inftimes, 
                     shape = le$p$gen.shape, 
-                    scale = le$p$gen.mean/p$gen.shape,
+                    scale = le$p$gen.mean/le$p$gen.shape,
                     log = TRUE))
     else 
       return(dgamma(time - inftimes, 
                     shape = le$p$gen.shape, 
-                    scale = le$p$gen.mean/p$gen.shape,
+                    scale = le$p$gen.mean/le$p$gen.shape,
                     log = FALSE))
 
   ### User-defined generation distribution ###

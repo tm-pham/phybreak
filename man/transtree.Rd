@@ -12,6 +12,7 @@ transtree(
   support = c("proportion", "count"),
   infection.times = c("all", "infector", "infector.sd"),
   time.quantiles = c(0.025, 0.5, 0.975),
+  show.besttree = FALSE,
   phylo.class = FALSE
 )
 }

@@ -212,6 +212,8 @@ phybreak <- function(dataset, times = NULL,
                                            "helpers", 
                                            "samplers", 
                                            "infect_function"))])
+  reference_date <- min(dataset$sample.times)
+  copy2userenv("reference_date", environment())
   
   ##############################
   ### third slot: parameters ###

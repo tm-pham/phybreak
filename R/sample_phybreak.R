@@ -119,11 +119,13 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
                  logLik = c(x$s$logLik, rep(NA, nsample)),
                  heat = c(x$s$heat, rep(NA, nsample)))
   
-  for (n in names(userenv$samplers)){
-    s.post <- c(s.post, list(c(x$s[[n]], rep(NA, nsample))))
-    names(s.post)[length(s.post)] <- n
+  if (!is.null(userenv$samplers)){
+    for (n in names(userenv$samplers)){
+      s.post <- c(s.post, list(c(x$s[[n]], rep(NA, nsample))))
+      names(s.post)[length(s.post)] <- n
+    }
   }
-    
+      
   s.posts <- lapply(1:nchains, function(i) s.post)
     
   build_pbe(x)
@@ -185,8 +187,10 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
           if (i == -10 && x$h$est.dist.m)  update_dist_mean()
           if (i == -11 && x$h$est.ir) update_ir()
           if (i < -11){
-            if (userenv$helpers[[-11 - i]]) {
-              userenv$updaters[[-11 - i]]()
+            if (!is.null(userenv$helpers)) {
+              if (userenv$helpers[[-11 - i]]) {
+                userenv$updaters[[-11 - i]]()
+              }
             }
           }
           
@@ -239,10 +243,11 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
                                pbe0$logLikdist, pbe0$logLikintro, pbe0$logLikseq) 
       s.post$heat[sa] <- pbe0$heat
       
-      for (i in 1:length(userenv$samplers)){
-        s.post[[names(userenv$samplers)[i]]][sa] <- tail(pbe0$p, length(userenv$samplers))[i][[1]] 
+      if (!is.null(userenv$samplers)){
+        for (i in 1:length(userenv$samplers)){
+          s.post[[names(userenv$samplers)[i]]][sa] <- tail(pbe0$p, length(userenv$samplers))[i][[1]] 
+        }
       }
-      
       s.posts[[chain]] <- s.post
       
     })

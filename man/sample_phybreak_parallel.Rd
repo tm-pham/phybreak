@@ -14,12 +14,13 @@ sample_phybreak_parallel(
   withinhost_only = 0,
   parameter_frequency = 1,
   status_interval = 10,
-  histtime = -1e+05,
-  history = FALSE,
+  verbose = 1,
+  historydist = 0.5,
   nchains = 1,
   heats = NULL,
   all_chains = FALSE,
-  outfile = ""
+  outfile = "",
+  report = 100
 )
 }
 \arguments{
