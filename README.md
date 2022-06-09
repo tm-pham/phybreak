@@ -17,3 +17,18 @@ Workflow:
 
 
 * it is possible to simulate data with 'sim_phybreak'
+
+## Installation
+
+The package requires some external libraries.
+Please install them by typing:
+
+```bash
+sudo apt-get install libblas-dev liblapack-dev
+```
+
+The package can be directly installed from GitHub using the `devtools` R package.
+
+```r
+devtools::install_github("https://github.com/bastiaanvdroest/phybreak/")
+```
