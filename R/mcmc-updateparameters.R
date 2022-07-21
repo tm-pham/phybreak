@@ -21,8 +21,8 @@ update_mu <- function() {
     
     ### calculate acceptance probability
     logaccprob <- pbe1$logLikseq - pbe0$logLikseq +
-      dnorm(log10(pbe1$p$mu), mean = h$mu.av, sd = h$mu.sd, log = TRUE) - 
-      dnorm(log10(pbe0$p$mu), mean = h$mu.av, sd = h$mu.sd, log = TRUE)
+      dnorm(pbe1$p$mu, mean = h$mu.av, sd = h$mu.sd, log = TRUE) - 
+      dnorm(pbe0$p$mu, mean = h$mu.av, sd = h$mu.sd, log = TRUE)
     
     ### accept or reject
     if (runif(1) < exp(logaccprob)) {

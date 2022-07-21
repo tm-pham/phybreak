@@ -151,7 +151,6 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
   shared_heats <- heats
   
   for (sa in tail(1:length(s.posts[[1]]$mu), nsample)) {
-    
     for (rep in 1:thin) {
       if(Sys.time() - curtime > status_interval & printlog == TRUE) {
         for (i in ls(envir=envirs[[1]])) copy2pbe0(i, envirs[[1]])
@@ -175,9 +174,9 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
             update_host(i, which_protocol, history || i == 0)
           }
         
-          if (i == -1 && x$h$est.mu)  update_mu()
-          if (i == -2 && x$h$est.mG)  update_mG()
-          if (i == -3 && x$h$est.mS)  update_mS()
+          if (i == -1 && x$h$est.mu) update_mu()
+          if (i == -2 && x$h$est.mG) update_mG()
+          if (i == -3 && x$h$est.mS) update_mS()
           if (i == -4 && x$h$est.wh.s)  update_wh_slope()
           if (i == -5 && x$h$est.wh.e)  update_wh_exponent()
           if (i == -6 && x$h$est.wh.0)  update_wh_level()
@@ -193,7 +192,6 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
               }
             }
           }
-          
           
         }
         
@@ -229,8 +227,6 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       s.post$hist.mean[sa] <- pbe0$p$hist.mean
       s.post$mG[sa] <- pbe0$p$gen.mean
       s.post$mS[sa] <- pbe0$p$sample.mean
-      #s.post$tG[sa] <- pbe0$p$trans.growth
-      #s.post$tS[sa] <- pbe0$p$trans.sample
       s.post$ir[sa] <- pbe0$p$intro.rate
       s.post$wh.h[sa] <- pbe0$p$wh.history
       s.post$wh.s[sa] <- pbe0$p$wh.slope
@@ -251,7 +247,6 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       s.posts[[chain]] <- s.post
       
     })
-    
   }
   
   s.posts <- lapply(1:length(heats), function(nheat){

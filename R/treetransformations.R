@@ -377,7 +377,11 @@ whichgeneration <- function(infectors, hostID) {
                                   nodetimes = v$nodetimes[1:length(it)], 
                                   le = list(p=p, v=c(v, list(inftimes = it))))
       dist[i] <- 0
-      res[i] <- sample(length(it), 1, prob = dist)
+      if(all(dist == 0))
+        res[i] <- 0
+      else
+        res[i] <- sample(length(it), 1, prob = dist)
+      
     }
   }
   # add additional introductions
@@ -400,51 +404,3 @@ make_nodehosts <- function(phybreakenv) {
       invisible(sapply(nodepath, function(x) hostpath[hostpathtimes < phybreakenv$v$nodetimes[x]][1]))
   }
 }
-
-# pullnodes_complete_multiple_introductions <- function(currentID) {
-#   nodes <- which(pbe1$v$nodehosts == currentID)
-#   transnodes <- which(pbe1$v$nodetypes == "t")
-#   transnode.currentID <- transnodes[currentID]
-#   if (any(pbe1$v$infectors == currentID) | length(nodes) > 1){
-#     innodes <- pbe1$v$infectors == currentID
-#     edgesin <- nodes
-#     edgeintimes <- pbe1$v$nodetimes[nodes]
-#     transnode.inftime <- pbe1$v$nodetimes[transnodes[currentID]]
-#     if (currentID == 1){
-#       coaltimes <- sapply(edgeintimes, function(t) runif(1, transnode.inftime, t))
-#       coaltimes <- coaltimes[-which(coaltimes == max(coaltimes))]
-#     } else {
-#       coaltimes <- sample_coaltimes(edgeintimes, transnode.inftime, pbe1$p)
-#     }
-#     
-#     if(length(coaltimes) >= 1){
-#       coalnodes <- which(pbe1$v$nodetypes == "c" &
-#                            pbe1$v$nodehosts == -1)[1:length(coaltimes)]
-#       pbe1$v$nodehosts[coalnodes] <- currentID
-#       pbe1$v$nodetimes[coalnodes] <- coaltimes
-#     } else {
-#       coalnodes <- c()
-#     }
-#     
-#     nodeorder <- order(c(coaltimes, edgeintimes))
-#     edgeend <- c(coalnodes, edgesin)[nodeorder]
-#     edgeendtimes <- c(coaltimes, edgeintimes)[nodeorder]
-#     
-#     # sample topology of minitree within hostID
-#     edgestart <- sample_topology(edgeend,
-#                                  edgeendtimes,
-#                                  c(rep("c", length(coaltimes)),
-#                                    rep("x", length(edgeintimes)))[nodeorder],
-#                                  transnode.currentID)
-#     
-#     pbe1$v$nodeparents[edgeend] <- edgestart
-#     if (pbe1$v$nodeparents[transnode.currentID] == -1 &
-#         pbe1$v$infectors[currentID] == 0)
-#       pbe1$v$nodeparents[transnode.currentID] <- 0
-#   } else {
-#     pbe1$v$nodeparents[currentID-1] <- transnodes[currentID]
-#     if (pbe1$v$nodeparents[transnode.currentID] == -1 &
-#         pbe1$v$infectors[currentID] == 0)
-#       pbe1$v$nodeparents[transnode.currentID] <- 0
-#   }
-# }

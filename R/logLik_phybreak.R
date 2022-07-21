@@ -88,14 +88,15 @@ lik_gentimes <- function(le){
   #                           p = p,
   #                           log = TRUE))
   # else 
-    0 + # force of infection from external source
+  #print(infect_distribution())
+  return(  0 + # force of infection from external source
       sum(dexp(diff(c(sort(v$inftimes[indices]), max(v$nodetimes))), rate = p$intro.rate, log = TRUE)) -
       log(p$intro.rate) +
-      sum(infect_distribution(v$inftimes[othercases],
-                              v$inftimes[v$infectors[othercases]],
+      sum(infect_distribution(time = v$inftimes[othercases],
+                              inftimes = v$inftimes[v$infectors[othercases]],
                               nodetimes = v$nodetimes[v$nodetypes=="s"][v$infectors[othercases]],
                               le = le,
-                              log = TRUE))
+                              log = TRUE)))
 }
 
 ### calculate the log-likelihood of sampling intervals 

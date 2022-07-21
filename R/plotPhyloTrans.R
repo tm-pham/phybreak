@@ -82,7 +82,7 @@
 #' @export
 plotPhyloTrans <- function(x, plot.which = c("sample", "mpc", "mtcc", "mcc"), samplenr = 0, 
                            select.how = "trees", select.who = "index", showmutations = FALSE,
-                           showhistory = TRUE, mar = 0.1 + c(4, 0, 0, 0), 
+                           showhistory = FALSE, mar = 0.1 + c(4, 0, 0, 0), 
                            tree.lwd = 1, tree.col = NULL, 
                            hostlabel = TRUE, hostlabel.cex = NULL, 
                            hostlabel.pos = "adjacent", hostlabel.col = tree.col,

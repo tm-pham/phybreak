@@ -101,10 +101,6 @@ build_pbe <- function(phybreak.obj) {
   ### change the variables slot to an environmental variables slot (with transmission nodes in the tree)
   v <- phybreak2environment(v)
   
-  #history <- add_history(d, v, p, h, s, build = TRUE, hist.inf = histtime)
-  #v <- history$v
-  #h <- history$h
-  
   ### complete likarray and calculate log-likelihood of sequences
   .likseqenv(le, (d$nsamples + 1):(2 * d$nsamples - 1), 1:d$nsamples)
   
