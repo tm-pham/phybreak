@@ -153,7 +153,7 @@ phybreak2trans <- function(vars, hostnames = c(), reference.date = 0,
 
 
 transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL, 
-                                introductions = 1) {
+                                introductions = 1, NJtree = FALSE) {
   
   ### extract and order samples
   refdate <- min(vars$sample.times)
@@ -202,7 +202,7 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
     resample <- TRUE
     inftimes <- .rinftimes(samtimes[1:nhosts], resamplepars$sample.mean, resamplepars$sample.shape)
     infectors <- .rinfectors(inftimes, introductions, p = resamplepars, 
-                             v = list(nodetimes = samtimes))
+                               v = list(nodetimes = samtimes))
   } else {
     inftimes <- as.numeric(vars$sim.infection.times - refdate)
     infectors <- match(vars$sim.infectors, hostnames)
@@ -213,23 +213,50 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
   }
   
   if(is.null(vars$sim.tree) | resample) {
-    res <- list(
-      inftimes = inftimes,
-      infectors = infectors,
-      nodetypes = c(rep("s", nhosts), rep("x", nsamples - nhosts), rep("c", nsamples - 1), rep("t", nhosts)),  
-      #node type (primary sampling, extra sampling, coalescent)
-      nodetimes = c(samtimes, samtimes[-1], inftimes),
-      nodehosts = c(samhosts, rep(-1, length(samhosts) - 1), infectors),
-      nodeparents = rep(-1, 2 * nsamples + nhosts - 1)
-    )
-    list2env(list(v = res, p = resamplepars, d = list(nsamples = nsamples)), pbe1)
-
-    if(resamplepars$wh.bottleneck == "wide") {
-      invisible(sapply(1:nhosts, rewire_pullnodes_wide))
+    
+    if (NJtree) {
+      # get mini-tree of history host from NJ tree
+      hist.phytree <- get_history_minitree(vars, nsamples, nhosts)
+ 
+      res <- list(
+        inftimes = inftimes,
+        infectors = rep(0, nhosts),
+        nodetypes = c(rep("s", nhosts), rep("x", nsamples - nhosts), rep("c", nsamples - 1), rep("t", nhosts)),  
+        #node type (primary sampling, extra sampling, coalescent)
+        nodetimes = c(samtimes, samtimes[-1], inftimes),
+        nodehosts = c(samhosts, rep(-1, length(samhosts) - 1), rep(0, nhosts)),
+        nodeparents = rep(-1, 2 * nsamples + nhosts - 1)
+      )
+      np <- c(0, hist.phytree$edge[,1])[order(c(nhosts + 1, hist.phytree$edge[, 2]))]
+      
+      list2env(list(v = res, p = resamplepars, d = list(nsamples = nsamples)), pbe1)
+      rewire_pullnodes_complete(0)
+      pbe1$v$nodeparents[(nsamples+1):(nsamples+nhosts-1)] <- c(0,tail(np, nhosts - 2)+nsamples-nhosts)
+      pbe1$v$nodeparents[(2*nsamples):(2*nsamples + nhosts - 1)] <- np[1:nhosts] + nsamples-nhosts
+      invisible(sapply(1:nhosts, rewire_pullnodes_complete))
+      invisible(sample_coaltimes_history(init = TRUE))
+      
+      res <- environment2phybreak(pbe1$v)
+      
     } else {
-      invisible(sapply(0:nhosts, rewire_pullnodes_complete))
+      res <- list(
+        inftimes = inftimes,
+        infectors = infectors,
+        nodetypes = c(rep("s", nhosts), rep("x", nsamples - nhosts), rep("c", nsamples - 1), rep("t", nhosts)),  
+        #node type (primary sampling, extra sampling, coalescent)
+        nodetimes = c(samtimes, samtimes[-1], inftimes),
+        nodehosts = c(samhosts, rep(-1, length(samhosts) - 1), infectors),
+        nodeparents = rep(-1, 2 * nsamples + nhosts - 1)
+      )
+      list2env(list(v = res, p = resamplepars, d = list(nsamples = nsamples)), pbe1)
+  
+      if(resamplepars$wh.bottleneck == "wide") {
+        invisible(sapply(1:nhosts, rewire_pullnodes_wide))
+      } else {
+        invisible(sapply(0:nhosts, rewire_pullnodes_complete))
+      }
+      res <- environment2phybreak(pbe1$v)
     }
-    res <- environment2phybreak(pbe1$v)
   } else {
     res <- list(
       inftimes = inftimes,
@@ -403,4 +430,78 @@ make_nodehosts <- function(phybreakenv) {
     phybreakenv$v$nodehosts[nodepath] <- 
       invisible(sapply(nodepath, function(x) hostpath[hostpathtimes < phybreakenv$v$nodetimes[x]][1]))
   }
+}
+
+get_history_minitree <- function(vars, nsamples, nhosts){
+  if(is.null(names(vars$sequences))) names(vars$sequences) <- 1:length(vars$sequences)
+  
+  if(nsamples != nhosts){
+    samples <- sapply(unique(vars$sample.hosts), function(x){
+      n <- which(vars$sample.hosts==x)
+      m <- which(vars$sample.times[n] == min(vars$sample.times[n]))[1]
+      return(n[m])})
+    sequences <- vars$sequences[samples]
+  } else {
+    sequences <- vars$sequences
+  }
+  
+  phytree <- midpoint(acctran(NJ(dist.hamming(sequences)), sequences))
+  labels <- sapply(which(phytree$edge[,2] %in% 1:nhosts), function(x){
+    return(as.numeric(phytree$tip.label[phytree$edge[x,2]]))
+  })
+  phytree$edge[,2][which(phytree$edge[,2] %in% 1:nhosts)] <- labels
+  
+  nodesubs <- c(ape::node.depth.edgelength(phytree) - min(ape::node.depth.edgelength(phytree)[1:nhosts]))
+  nodesubs <- tail(nodesubs, nhosts-1)
+  nodesubs.pos <- nodesubs
+  
+  for(i in seq_along(nodesubs)){
+    if (sum(nodesubs == nodesubs[i]) == 1){
+      n <- which(order(nodesubs) == i)
+      nodesubs.pos[i] <- n
+    } else {
+      n <- which(nodesubs == nodesubs[i])
+      
+      npaths <- lapply(n + nhosts, function(x) return(nodepath(phytree, from = nhosts + 1, to = x)))
+      for (j in seq_along(npaths)){
+        for (k in seq_along(npaths)){
+          if (all(npaths[[j]] %in% npaths[[k]])) npaths[[j]] <- npaths[[k]]
+        }
+      }
+      npaths <- unlist(npaths[!duplicated(npaths)])[]
+      node.order <- order(match(n + nhosts, npaths))
+      
+      nodesubs.pos[n] <- match(n, order(nodesubs))[node.order]
+    }
+  }
+  
+  phytree$edge <- cbind(sapply(phytree$edge[,1], function(x){
+    return(nodesubs.pos[x - nhosts] + nhosts)
+  }), 
+  sapply(phytree$edge[,2], function(x){
+    if (x > nhosts)
+      return(nodesubs.pos[x - nhosts] + nhosts)
+    else
+      return(x)
+  }))
+  phytree$tip.label <- as.character(1:nhosts)
+  
+  return(phytree)
+}
+
+phytree2coaltimes <- function(phybreakenv, phytree){
+  edgeintimes <- pbe1$v$inftimes
+  
+  # all coalescent nodes in new infector and hostID
+  coalnodes <- which(pbe1$v$nodehosts == 0 & pbe1$v$nodetypes == "c")
+  
+  ### Second, rebuild minitree
+  # times of coalescent events in hostID and bottleneck size, and distribute coalescent nodes over hostID and pre-hostID
+  newcoaltimes <- sample_coaltimes(edgeintimes, pbe1$v$inftimes[0], pbe1$p, 0 == 0)
+  newcoaltimes <- newcoaltimes - abs(min(pbe1$v$inftimes) - max(newcoaltimes))
+  
+  pbe1$v$nodetimes[coalnodes] <- newcoaltimes
+  # pbe1$v$nodetimes <- pbe1$v$nodetimes[pbe1$v$nodetypes != "t"]
+  # pbe1$v$nodehosts <- pbe1$v$nodehosts[pbe1$v$nodetypes != "t"]
+  # pbe1$v$nodetypes <- pbe1$v$nodetypes[pbe1$v$nodetypes != "t"]
 }

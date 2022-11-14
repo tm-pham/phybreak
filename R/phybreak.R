@@ -122,7 +122,7 @@ phybreak <- function(dataset, times = NULL,
          est.mu = TRUE, prior.mu.mean = 0, prior.mu.sd = 100,
          est.gen.mean = TRUE, prior.gen.mean.mean = 1, prior.gen.mean.sd = Inf,
          est.sample.mean = TRUE, prior.sample.mean.mean = 1, prior.sample.mean.sd = Inf,
-         est.intro.rate = TRUE, prior.intro.rate.mean = 1, prior.intro.rate.sd = Inf,
+         est.intro.rate = TRUE, prior.intro.rate.mean = 1, prior.intro.rate.shape = 1,
          est.trans.growth = TRUE, est.trans.sample = TRUE, 
          est.wh.slope = TRUE, prior.wh.slope.shape = 3, prior.wh.slope.mean = 1,
          est.wh.exponent = TRUE, prior.wh.exponent.shape = 1, prior.wh.exponent.mean = 1,
@@ -131,7 +131,7 @@ phybreak <- function(dataset, times = NULL,
          est.dist.exponent = TRUE, prior.dist.exponent.shape = 1, prior.dist.exponent.mean = 1,
          est.dist.scale = TRUE, prior.dist.scale.shape = 1, prior.dist.scale.mean = 1,
          est.dist.mean = TRUE, prior.dist.mean.shape = 1, prior.dist.mean.mean = 1,
-         use.tree = FALSE, ...) {
+         use.tree = FALSE, use.NJtree = TRUE, ...) {
   ########################################################
   ### parameter name compatibility with older versions ###
   ########################################################
@@ -149,8 +149,11 @@ phybreak <- function(dataset, times = NULL,
   ###########################################
   dataset <- testdataclass_phybreak(dataset, times, ...)
   rownames(as.character(dataset$sequences))
-  if(use.tree) introductions <- testfortree_phybreak(dataset, introductions)
-  if(introductions > 1) multiple.introductions <- TRUE
+  if(use.tree) {
+    introductions <- testfortree_phybreak(dataset, introductions)
+    use.NJtree <- FALSE
+  }
+  if(introductions > 1 | use.NJtree) multiple.introductions <- TRUE
   if(!multiple.introductions) {
     intro.rate <- 1
     est.intro.rate <- FALSE
@@ -245,9 +248,10 @@ phybreak <- function(dataset, times = NULL,
   ### second slot: variables ###
   ##############################
   phybreakvariables <- transphylo2phybreak(dataset, resample = !use.tree, resamplepars = parameterslot,
-                                           introductions = introductions)
+                                           introductions = introductions, NJtree = use.NJtree)
   variableslot <- phybreakvariables$v
   dataslot$reference.date <- phybreakvariables$d$reference.date
+  dataslot$names <- phybreakvariables$d$names
   
   #################
   # parameters$mu #
@@ -287,7 +291,7 @@ phybreak <- function(dataset, times = NULL,
                      mS.av = prior.sample.mean.mean,
                      mS.sd = prior.sample.mean.sd,
                      ir.av = prior.intro.rate.mean,
-                     ir.sd = prior.intro.rate.sd,
+                     ir.sh = prior.intro.rate.shape,
                      wh.s.sh = prior.wh.slope.shape,
                      wh.s.av = prior.wh.slope.mean,
                      wh.e.sh = prior.wh.exponent.shape,

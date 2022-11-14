@@ -266,7 +266,10 @@ rearrange_tree_matrix <- function(){
   v <- pbe1$v
   p <- pbe1$p
 
-  v$tree <- sapply(1:p$obs, function(x) tail(.ptr(v$infectors, x), 1))
+  v$tree <- sapply(1:p$obs, function(x){
+    path <- .ptr(v$infectors, x)
+    return(path[length(path)])
+  })
   
   copy2pbe1("v", environment())
 }

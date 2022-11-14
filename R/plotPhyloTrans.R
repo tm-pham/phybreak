@@ -301,6 +301,11 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
     xroots <- sapply(treelist, function(xx) xx$xroot)
     tojoin <- which(xroots == max(xroots))
     trees2join <- treelist[tojoin]
+    if (length(trees2join) > 2){
+      roots <- sapply(trees2join, function(xx) xx$rootnode)
+      trees2join <- trees2join[which(roots == names(table(roots))[which(table(roots) == 2)][1])]
+      tojoin <- tojoin[which(roots == names(table(roots))[which(table(roots) == 2)][1])]
+    }
     treelist <- treelist[-tojoin]
     
     # order trees by yscore

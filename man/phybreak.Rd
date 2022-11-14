@@ -38,7 +38,7 @@ phybreak(
   prior.sample.mean.sd = Inf,
   est.intro.rate = TRUE,
   prior.intro.rate.mean = 1,
-  prior.intro.rate.sd = Inf,
+  prior.intro.rate.shape = 1,
   est.trans.growth = TRUE,
   est.trans.sample = TRUE,
   est.wh.slope = TRUE,
@@ -63,6 +63,7 @@ phybreak(
   prior.dist.mean.shape = 1,
   prior.dist.mean.mean = 1,
   use.tree = FALSE,
+  use.NJtree = TRUE,
   ...
 )
 }

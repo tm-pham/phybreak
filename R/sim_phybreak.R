@@ -9,9 +9,8 @@
 #' @param samplesperhost Number of samples to be taken per host, either a vector or a single number.
 #' @param R0 The basic reproduction ratio used for simulation. The offspring distribution is Poisson.
 #' @param introductions The number of index cases when simulating a multiple introduced outbreak.
-#' @param introdistribution The probability distribution for the infection times of the index cases. Options are 
-#'   \code{introdistribution = "exp"} for an exponential grow over time of the probability density, or 
-#'   \code{introdistribution = "unif"} for an uniform probability distribution.
+#' @param intro.rate The rate in which introductions appear. The \code{intro.rate} is the parameter of the exponential waiting time distribution between the 
+#' introductions.
 #' @param spatial If \code{TRUE}, the hosts are placed on a square with density 1, and a distance kernel is used to 
 #'   model transmission probabilities between the hosts.
 #' @param gen.shape The shape parameter of the gamma-distributed generation interval.
@@ -36,6 +35,7 @@
 #' @param wh.exponent Within-host exponent, used if \code{wh.model = "exponential"}
 #' @param wh.level Within-host effective pathogen size at transmission, used if \code{wh.bottleneck = "wide"}
 #'   (if \code{wh.model = "exponential"} or \code{"constant"}, and optional if \code{wh.model = "linear"})
+#' @param wh.history Within-host coalescent rate of the history host. Rate = 1/\code{wh.history}.
 #' @param dist.model The distance kernel to use if \code{spatial = TRUE}. Options are:
 #'   \enumerate{
 #'     \item "power": a power law function pr(dist) ~ 1 / (1 + (dist/dist.scale) ^ dist.exponent)
@@ -58,7 +58,7 @@
 #' simulation <- sim_phybreak()
 #' @export
 sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
-                         introductions = 1, intro.rate = 1,
+                         introductions = 1, intro.rate = 1, outbreak.duration = 10,
                          R0 = 1.5, spatial = FALSE,
                          gen.shape = 10, gen.mean = 1, 
                          sample.shape = 10, sample.mean = 1,
@@ -112,7 +112,7 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
       res <- sim_outbreak_size_spatial(obsize, popsize, R0, introductions, intro.rate, gen.shape, gen.mean,
                                sample.shape, sample.mean, dist.model, dist.exponent, dist.scale)
     } else {
-      res <- sim_outbreak_size(obsize, popsize, introductions, intro.rate, R0, gen.shape, gen.mean,
+      res <- sim_outbreak_size(obsize, popsize, introductions, intro.rate, outbreak.duration, R0, gen.shape, gen.mean,
                                sample.shape, sample.mean)
     }
   }
@@ -171,16 +171,16 @@ sim.phybreak <- function(...) {
 
 ### simulate an outbreak of a particular size by repeating
 ### simulations until obsize is obtained
-sim_outbreak_size <- function(obsize, Npop, intronr, introrate, R0, aG, mG, aS, mS) {
+sim_outbreak_size <- function(obsize, Npop, intronr, introrate, duration, R0, aG, mG, aS, mS) {
   if(is.na(Npop)) {
     Npop <- obsize
     while(1 - obsize/Npop < exp(-R0* obsize/Npop)) {Npop <- Npop + 1}
   } 
   
-  sim <- sim_outbreak(Npop, intronr, introrate, R0, aG, mG, aS, mS)
+  sim <- sim_outbreak(Npop, intronr, introrate, duration, R0, aG, mG, aS, mS)
   
   while(sim$obs != obsize) {
-    sim <- sim_outbreak(Npop, intronr, introrate, R0, aG, mG, aS, mS)
+    sim <- sim_outbreak(Npop, intronr, introrate, duration, R0, aG, mG, aS, mS)
   }
   
   return(sim)
@@ -203,9 +203,9 @@ sim_outbreak_size_spatial <- function(obsize, Npop, R0, intronr, introrate, aG, 
 
 
 ### simulate an outbreak
-sim_outbreak <- function(Npop, intronr, introrate, R0, aG, mG, aS, mS) {
+sim_outbreak <- function(Npop, intronr, introrate, duration, R0, aG, mG, aS, mS) {
   ### initialize
-  introintervals <- rexp(intronr - 1, rate = introrate)
+  introintervals <- rexp(intronr - 1, rate = intronr/duration)
   inftimes <- c(0, cumsum(introintervals), rep(10000, Npop - intronr))
   sources <- rep(0, Npop)
   nrcontacts <- rpois(Npop, R0)
@@ -223,7 +223,7 @@ sim_outbreak <- function(Npop, intronr, introrate, R0, aG, mG, aS, mS) {
     whocontacted <- sample(Npop, nrcontacts[currentID], replace = TRUE)
     
     #are these contacts successful, i.e. earlier than the existing contacts with these hosts?
-    successful <- whencontacts < inftimes[whocontacted] & whocontacted > intronr
+    successful <- whencontacts < inftimes[whocontacted] & whencontacts < duration & whocontacted > intronr
     
     #change infectors and infection times of successful contactees
     sources[whocontacted[successful]] <- currentID

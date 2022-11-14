@@ -114,7 +114,9 @@ update_ir <- function() {
   propose_pbe("ir")
   
   ### calculate acceptance probability
-  logaccprob <- pbe1$logLikgen - pbe0$logLikgen
+  logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio + 
+    dgamma(pbe1$p$intro.rate, shape = h$ir.sh, scale = h$ir.av/h$ir.sh, log = TRUE) - 
+    dgamma(pbe0$p$intro.rate, shape = h$ir.sh, scale = h$ir.av/h$ir.sh, log = TRUE)
   
   ### accept
   if (runif(1) < exp(logaccprob)) {

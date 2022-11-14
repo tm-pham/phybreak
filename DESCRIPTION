@@ -1,7 +1,7 @@
 Package: phybreak
 Type: Package
 Title: Analysis of Outbreaks with Sequence Data
-Version: 0.5.2
+Version: 1.0.0
 Date: 2019-09-12
 Authors@R: person("Don", "Klinkenberg", 
     email = "don@xs4all.nl", role = c("aut", "cre"))
@@ -30,5 +30,5 @@ Suggests:
     knitr,
     rmarkdown
 LinkingTo: Rcpp
-RoxygenNote: 7.1.1
+RoxygenNote: 7.2.1
 VignetteBuilder: knitr

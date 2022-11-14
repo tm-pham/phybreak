@@ -11,7 +11,7 @@ plotPhyloTrans(
   select.how = "trees",
   select.who = "index",
   showmutations = FALSE,
-  showhistory = TRUE,
+  showhistory = FALSE,
   mar = 0.1 + c(4, 0, 0, 0),
   tree.lwd = 1,
   tree.col = NULL,

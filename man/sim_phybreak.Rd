@@ -11,6 +11,7 @@ sim_phybreak(
   samplesperhost = 1,
   introductions = 1,
   intro.rate = 1,
+  outbreak.duration = 10,
   R0 = 1.5,
   spatial = FALSE,
   gen.shape = 10,
@@ -44,6 +45,9 @@ an \code{obsize} can severely increase the simulation time, depending on \code{R
 \item{samplesperhost}{Number of samples to be taken per host, either a vector or a single number.}
 
 \item{introductions}{The number of index cases when simulating a multiple introduced outbreak.}
+
+\item{intro.rate}{The rate in which introductions appear. The \code{intro.rate} is the parameter of the exponential waiting time distribution between the 
+introductions.}
 
 \item{R0}{The basic reproduction ratio used for simulation. The offspring distribution is Poisson.}
 
@@ -82,6 +86,8 @@ Options are:
 \item{wh.level}{Within-host effective pathogen size at transmission, used if \code{wh.bottleneck = "wide"}
 (if \code{wh.model = "exponential"} or \code{"constant"}, and optional if \code{wh.model = "linear"})}
 
+\item{wh.history}{Within-host coalescent rate of the history host. Rate = 1/\code{wh.history}.}
+
 \item{dist.model}{The distance kernel to use if \code{spatial = TRUE}. Options are:
 \enumerate{
   \item "power": a power law function pr(dist) ~ 1 / (1 + (dist/dist.scale) ^ dist.exponent)
@@ -98,10 +104,6 @@ Options are:
 
 \item{...}{If arguments from previous versions of this function are used, they may be interpreted correctly through 
 this argument, but it is better to provide the correct argument names.}
-
-\item{introdistribution}{The probability distribution for the infection times of the index cases. Options are 
-\code{introdistribution = "exp"} for an exponential grow over time of the probability density, or 
-\code{introdistribution = "unif"} for an uniform probability distribution.}
 }
 \value{
 The simulation output as an object of class \code{'phybreakdata'} with sequences (class \code{'phyDat'}) and 

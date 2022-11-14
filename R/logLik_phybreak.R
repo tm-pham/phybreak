@@ -91,6 +91,7 @@ lik_gentimes <- function(le){
   #print(infect_distribution())
   return(  0 + # force of infection from external source
       sum(dexp(diff(c(sort(v$inftimes[indices]), max(v$nodetimes))), rate = p$intro.rate, log = TRUE)) -
+      #log(p$intro.rate^(length(v$inftimes))*exp(-p$intro.rate*(max(v$nodetimes) - min(v$inftimes)))) -
       log(p$intro.rate) +
       sum(infect_distribution(time = v$inftimes[othercases],
                               inftimes = v$inftimes[v$infectors[othercases]],
@@ -304,11 +305,13 @@ lik_topology_host <- function(phybreakenv, hostID) {
   coalnodes <- coalnodes[orderednodes]
   
   bottlenecks <- sum(1 - 2 * coalnodes) - 1
-  dlineage <- 2 * c(FALSE, head(coalnodes, -1)) - 1
+  #dlineage <- 2 * c(FALSE, head(coalnodes, -1)) - 1
+  dlineage <- 2 * c(FALSE, coalnodes[1:(length(coalnodes)-1)]) - 1
   dlineage[1] <- bottlenecks
   nrlineages <- 1 + cumsum(dlineage)
   
-  logcoalprobabilities <- -log(choose(nrlineages[c(FALSE, head(coalnodes, -1))], 2))
+  #logcoalprobabilities <- -log(choose(nrlineages[c(FALSE, head(coalnodes, -1))], 2))
+  logcoalprobabilities <- -log(choose(nrlineages[c(FALSE, coalnodes[1:(length(coalnodes)-1)])], 2))
   
   return(sum(logcoalprobabilities))
 }

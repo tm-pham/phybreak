@@ -215,7 +215,7 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
   timedorder <- order(head(ordertimes, -1))
   inftimes <- x$sim.infection.times[timedorder]
   samtimes <- x$sample.times[timedorder]
-  cultimes <- x$culling.times[timedorder]
+  cultimes <- userenv$culling.times[timedorder]
   infectors <- x$sim.infectors[timedorder]
   arrow.colours <- arrow.colours[timedorder]
   hosts <- names(inftimes)
@@ -289,12 +289,19 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
   for(i in 1:obs) {
     x0s <- seq(inftimes[i], tmax - tstep, tstep)
     # widths <- abs(1 - (maxwd - dgamma(x0s - inftimes[i], shape = tgshape, scale = tgscale)) / maxwd)
-    
+    print(cultimes[i])
+    if(p$trans.model == "user-defined"){
+      widths <- sapply(x0s, function(x){
+        ifelse(x <= cultimes[i], 1, 0)
+      })
+      print(widths)
+      widths <- abs(1 - (maxwd - widths)/maxwd)
+    } else {
     widths <- abs(1 - (maxwd - infect_distribution(x0s, inftimes[i], 
-                                                   p = p, 
-                                                   nodetimes = samtimes,
-                                                   cultimes = cultimes,
-                                                   host = i)) / maxwd)
+                                                   le = list(p = p, v = list(nodetimes = samtimes,
+                                                                             cultimes = cultimes)),
+                                                   nodetimes = samtimes)) / maxwd)
+    }
     
     do.call(polygon,
             c(list(x = c(x0s, rev(x0s)),

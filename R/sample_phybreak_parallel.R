@@ -135,7 +135,7 @@ sample_phybreak_parallel <- function(x, nsample, thin = 1, thinswap = 1, classic
   clusterExport(cl, varlist = c("x", "nsample", "nswaps", "thin", "thinswap",
                                 "classic", "keepphylo", "withinhost_only",
                                 "status_interval", "parameter_frequency", 
-                                "historydist", "report"),
+                                "historydist", "report", "phybreak:::userenv"),
                 envir = environment())
   
   if (outfile != "")

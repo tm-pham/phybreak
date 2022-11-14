@@ -200,7 +200,7 @@ update_host_history <- function(hostID, which_protocol) {
   ### going down the decision tree
   if (hostID == 0) {
     # Y (hostID is history)
-    update_host_withinhost(hostID)
+    update_historyhost()
   } else {
     # N (hostID is not history)
     if (tinf.prop < min(c(v$inftimes[v$infectors == hostID], Inf))) {
@@ -499,6 +499,34 @@ update_host_history <- function(hostID, which_protocol) {
     }
   }
   
+  update_historyhost <- function(){
+    ### create an up-to-date proposal-environment with hostID as focal host
+    prepare_pbe()
+    
+    i <- 0
+    while(i < 5) {
+      if (sample_coaltimes_history()) {
+        i <- i + 1
+      } else {
+        break
+      }
+    }
+    if (i == 5) return()
+    
+    ### else, calculate proposal ratio
+    logproposalratio <- 0
+    
+    ### calculate likelihood
+    propose_pbe("withinhost")
+    
+    ### calculate acceptance probability
+    logaccprob <- pbe1$logLikseq - pbe0$logLikseq + logproposalratio
+    
+    ### accept or reject
+    if (runif(1) < exp(logaccprob)) {
+      accept_pbe("withinhost")
+    }
+  }
   
   ### update if proposal is add/remove index case and tinf.prop is before first secondary case
   update_pathL <- function(which_protocol) {
@@ -519,6 +547,8 @@ update_host_history <- function(hostID, which_protocol) {
                                  (tinf.prop - v$inftimes > 0)/pbe0$h$dist[hostID, ], 1)
     dens.infectorproposal[which(infect.dist == 0)] <- 0
     dens.infectorproposal[hostID] <- 0
+    
+    if(all(dens.infectorproposal == 0)) return() 
     
     infector.proposed.ID <- sample(p$obs+1, 1, prob = dens.infectorproposal)
     
