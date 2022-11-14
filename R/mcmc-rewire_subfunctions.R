@@ -1,60 +1,90 @@
 ### attach ("pull") new tips to the existing minitree in currentID (complete bottleneck)
 rewire_pullnodes_complete <- function(currentID) {
+  
+  # tips to be connected in currentID
   loosenodes <- which(pbe1$v$nodehosts == currentID & pbe1$v$nodeparents == -1)
+  
+  # only if there is a loose node
   if(length(loosenodes) > 0) {
+    
+    # available coalescent nodes
     free_cnodes <- which(pbe1$v$nodetypes == "c" & pbe1$v$nodeparents == -1)
-    if(currentID == 0) {
-      pbe1$v$nodeparents[loosenodes] <- 0L
-    } else {
-      # old edges entering currentID, with endtimes
-      edgesendold <- setdiff(which(pbe1$v$nodehosts == currentID & pbe1$v$nodetypes != "c"), loosenodes)
-      if(length(edgesendold) == 0) {
+    
+    # if(currentID == 0 && length(free_cnodes) == 0) {
+    #   if(sum(pbe1$v$infectors==0) == 1){
+    #     pbe1$v$nodeparents[loosenodes] <- 0L
+    #   } else {
+    #     coalnodes <- which(pbe1$v$nodetypes == "c" & pbe1$v$nodehosts == 0)
+    #     free_cnodes <- coalnodes[sapply(coalnodes, function(x) sum(pbe1$v$nodeparents == x) == 1)]
+    #     pbe1$v$nodeparents[loosenodes] <- free_cnodes
+    #   }
+    #   return()
+    # }
+    
+    # edges already entering currentID
+    edgesendold <- setdiff(which(pbe1$v$nodehosts == currentID & pbe1$v$nodetypes != "c"), loosenodes)
+    
+    # if no edges already entering, make one by connecting one tip to host's root node
+    if(length(edgesendold) == 0) {
+      # in history host: connect first tip to non-existing node 0
+      if(currentID == 0) {
+        parentnode <- 0
+        edgesendold <- loosenodes[1]
+        pbe1$v$nodeparents[edgesendold] <- parentnode
+        loosenodes <- setdiff(loosenodes, edgesendold)
+      } else 
+        # in other hosts, connect sampling tip to infection node
+      {
         parentnode <- 2 * pbe1$d$nsamples - 1 + currentID
         edgesendold <- currentID
         pbe1$v$nodeparents[edgesendold] <- parentnode
         pbe1$v$nodehosts[parentnode] <- pbe1$v$infectors[currentID]
         pbe1$v$nodetimes[parentnode] <- pbe1$v$inftimes[currentID]
-        loosenodes <- setdiff(loosenodes, currentID)
+        loosenodes <- setdiff(loosenodes, edgesendold)
       }
-      edgesendoldtimes <- pbe1$v$nodetimes[edgesendold]
+    }
+    
+    # old edges entering currentID, with endtimes
+    edgesendoldtimes <- pbe1$v$nodetimes[edgesendold]
+    
+    # only if any loose node still present
+    if(length(loosenodes) > 0) {
+      # coalescentnodes in currentID, with endtimes
+      coalescentnodesold <- which(pbe1$v$nodehosts == currentID & pbe1$v$nodetypes == "c")
+      coalescenttimesold <- pbe1$v$nodetimes[coalescentnodesold]
       
-      if(length(loosenodes) > 0) {
-        # coalescentnodes in currentID, with endtimes
-        coalescentnodesold <- which(pbe1$v$nodehosts == currentID & pbe1$v$nodetypes == "c")
-        coalescenttimesold <- pbe1$v$nodetimes[coalescentnodesold]
-        
-        # endtimes of new edges, and new coalescenttimes
-        loosenodetimes <- c()
-        coalescenttimesnew <- c()
-        for(le in 1:length(loosenodes)) {
-          coalescenttimesnew <- c(coalescenttimesnew,
-                                  sample_singlecoaltime(c(edgesendoldtimes, loosenodetimes),
-                                                        c(coalescenttimesold, coalescenttimesnew),
-                                                        pbe1$v$nodetimes[loosenodes[le]], pbe1$v$inftimes[currentID], pbe1$p))
-          loosenodetimes <- c(loosenodetimes, pbe1$v$nodetimes[loosenodes[le]])
-        }
-        
-        # old within-host minitree
-        childnodes <- c(edgesendold, coalescentnodesold)
-        parentnodes <- pbe1$v$nodeparents[childnodes]
-        childnodestimes <- c(edgesendoldtimes, coalescenttimesold)
-        
-        # place new edges into minitree
-        loosenodestoinfector <- c()
-        free_cnodestoinfector <- c()
-        for(le in 1:length(loosenodes)) {
-          newchildnode <- sample_singlechildnode(childnodes, parentnodes, childnodestimes, coalescenttimesnew[le])
-          childnodes <- c(childnodes, loosenodes[le], free_cnodes[le])
-          parentnodes <- c(parentnodes, free_cnodes[le], parentnodes[childnodes == newchildnode])
-          childnodestimes <- c(childnodestimes, loosenodetimes[le], coalescenttimesnew[le])
-          parentnodes[childnodes == newchildnode] <- free_cnodes[le]
-        }
-        
-        # change phybreak object
-        pbe1$v$nodetimes[childnodes] <- childnodestimes
-        pbe1$v$nodehosts[childnodes] <- currentID
-        pbe1$v$nodeparents[childnodes] <- parentnodes
+      # endtimes of new edges, and new coalescenttimes
+      loosenodetimes <- c()
+      coalescenttimesnew <- c()
+      
+      for(le in 1:length(loosenodes)) {
+        coalescenttimesnew <- c(coalescenttimesnew,
+                                sample_singlecoaltime(c(edgesendoldtimes, loosenodetimes),
+                                                      c(coalescenttimesold, coalescenttimesnew),
+                                                      pbe1$v$nodetimes[loosenodes[le]], pbe1$v$inftimes[currentID], pbe1$p, currentID == 0))
+        loosenodetimes <- c(loosenodetimes, pbe1$v$nodetimes[loosenodes[le]])
       }
+      
+      # old within-host minitree
+      childnodes <- c(edgesendold, coalescentnodesold)
+      parentnodes <- pbe1$v$nodeparents[childnodes]
+      childnodestimes <- c(edgesendoldtimes, coalescenttimesold)
+      
+      # place new edges into minitree
+      loosenodestoinfector <- c()
+      free_cnodestoinfector <- c()
+      for(le in 1:length(loosenodes)) {
+        newchildnode <- sample_singlechildnode(childnodes, parentnodes, childnodestimes, coalescenttimesnew[le])
+        childnodes <- c(childnodes, loosenodes[le], free_cnodes[le])
+        parentnodes <- c(parentnodes, free_cnodes[le], parentnodes[childnodes == newchildnode])
+        childnodestimes <- c(childnodestimes, loosenodetimes[le], coalescenttimesnew[le])
+        parentnodes[childnodes == newchildnode] <- free_cnodes[le]
+      }
+      
+      # change phybreak object
+      pbe1$v$nodetimes[childnodes] <- childnodestimes
+      pbe1$v$nodehosts[childnodes] <- currentID
+      pbe1$v$nodeparents[childnodes] <- parentnodes
     }
   }
 }
@@ -208,6 +238,7 @@ take_cnode <- function(childnode) {
     if(pbe1$v$nodetypes[childnode] == "b") pbe1$v$nodetypes[childnode] <- "0"
   }
   second_childnode <- setdiff(which(pbe1$v$nodeparents == parentnode), childnode)
+
   pbe1$v$nodeparents[second_childnode] <- pbe1$v$nodeparents[parentnode]
   pbe1$v$nodehosts[c(childnode, parentnode)] <- -1L
   pbe1$v$nodeparents[c(childnode, parentnode)] <- -1L
@@ -231,3 +262,14 @@ link_s_to_t <- function(parentnodes, childnodes, snode, tnode) {
   return(parentnodes)
 }
 
+rearrange_tree_matrix <- function(){
+  v <- pbe1$v
+  p <- pbe1$p
+
+  v$tree <- sapply(1:p$obs, function(x){
+    path <- .ptr(v$infectors, x)
+    return(path[length(path)])
+  })
+  
+  copy2pbe1("v", environment())
+}

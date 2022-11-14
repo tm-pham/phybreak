@@ -54,104 +54,120 @@
 #' plot(MCMCstate, plot.which = "mpc")
 #' @export
 transtree <- function(x, method = c("count", "edmonds", "mpc", "mtcc"), samplesize = Inf, infector.name = TRUE, 
-    support = c("proportion", "count"), infection.times = c("all", "infector", "infector.sd"), time.quantiles = c(0.025, 0.5, 0.975), phylo.class = FALSE) {
+    support = c("proportion", "count"), infection.times = c("all", "infector", "infector.sd"), time.quantiles = c(0.025, 0.5, 0.975), 
+    show.besttree = FALSE, phylo.class = FALSE) {
   if (!inherits(x, "phybreak")) 
     stop("object should be of class \"phybreak\"")
   
   chainlength <- length(x$s$mu)
     
-    ### tests
-    if (chainlength == 0) 
-        stop("no sampled trees available")
-    if (samplesize > chainlength & samplesize < Inf) {
-        warning("desired 'samplesize' larger than number of available samples")
+  ### tests
+  if (chainlength == 0) 
+      stop("no sampled trees available")
+  if (samplesize > chainlength & samplesize < Inf) {
+      warning("desired 'samplesize' larger than number of available samples")
+  }
+  support <- match.arg(support)
+  infection.times <- match.arg(infection.times)
+  if (infection.times == "all" || infection.times == "infector") {
+      if (class(time.quantiles) != "numeric") {
+          stop("time.quantiles should be numeric")
+      }
+      if (max(time.quantiles) > 1 || min(time.quantiles) < 0) {
+          stop("time.quantiles should be between 0 and 1")
+      }
+  }
+  if (show.besttree) {
+    if (method[1] != "mpc") {
+      warning("best tree only available for mpc")
+      show.besttree = FALSE
     }
-    support <- match.arg(support)
-    infection.times <- match.arg(infection.times)
-    if (infection.times == "all" || infection.times == "infector") {
-        if (class(time.quantiles) != "numeric") {
-            stop("time.quantiles should be numeric")
-        }
-        if (max(time.quantiles) > 1 || min(time.quantiles) < 0) {
-            stop("time.quantiles should be between 0 and 1")
-        }
-    }
-    
-    ### initialization
-    samplesize <- min(samplesize, chainlength)
-    nsamples <- x$d$nsamples
-    obs <- x$p$obs
-    res <- c()
-    
-    ### decision tree to use correct model
-    if (method[1] == "count") {
-        res <- .transtreecount(x, samplesize, infection.times[1] == "infector.sd")
-    }
-    if (method[1] == "edmonds") {
-        res <- .transtreeedmonds(x, samplesize, infection.times[1] == "infector.sd")
-    }
-    if (method[1] == "mpc") {
-        res <- .mpcinfector(x, samplesize, phylo.class, infection.times[1] == "infector.sd")
-        if (phylo.class) 
-            return(get.phylo(x, samplenr = res, simmap = TRUE))
-    }
-    if (method[1] == "mtcc") {
-        res <- .mtcctree(x$s$infectors[, (1:samplesize) + chainlength - samplesize], 
-                         x$s$inftimes[, (1:samplesize) + chainlength - samplesize], c(obs, samplesize))
-        if (phylo.class) 
-            return(get.phylo(x, samplenr = tail(res, 1) + chainlength - samplesize, simmap = TRUE))
-        res <- matrix(head(res, -1), ncol = 5)
-    }
-    # if(method[1] == 'cc.construct') { res <- matrix(.CCtranstreeconstruct( x$s$nodehosts[obs:(2*obs-1),
-    # (1:samplesize) + chainlength - samplesize], x$s$nodetimes[obs:(2*obs-1), (1:samplesize) + chainlength -
-    # samplesize], c(obs, samplesize) ), ncol = 4) } test: no correct method provided
-    if (length(res) == 0) {
-        stop("incorrect method provided, choose \"count\", \"edmonds\",
-         \"mpc\", or \"mtcc\"")
-    }
-    
-    ### build output infectors
-    if (infector.name) {
-        infectors.out <- matrix(c("index", x$d$hostnames)[1 + res[, 1]], ncol = 1, dimnames = list(x$d$hostnames[1:obs], 
-            "infector"))
-    } else {
-        infectors.out <- matrix(res[, 1], ncol = 1, dimnames = list(x$d$hostnames[1:obs], "infector"))
-    }
-    # support
-    if (support[1] == "count") {
-        support.out <- res[, 2]
-    } else {
-        support.out <- res[, 2]/samplesize
-    }
-    # times
-    if (infection.times[1] == "infector") {
-        posttimes <- x$s$inftimes[, (1:samplesize) + chainlength - samplesize]
-        posttimes[res[, 1] != x$s$infectors[, (1:samplesize) + chainlength - samplesize]] <- NA
-        time.out <- apply(posttimes, 1, quantile, probs = time.quantiles, na.rm = TRUE)
-        cnames <- paste0("inf.times.Q", 100 * time.quantiles)
-    } else if (infection.times[1] == "infector.sd") {
-        if (method[1] == "mpc" || method[1] == "mtcc") {
-            time.out <- res[, 3:5]
-            cnames <- paste0("inf.times.", c("mean", "sd", "mc.tree"))
-        } else {
-            time.out <- res[, 3:4]
-            cnames <- paste0("inf.times.", c("mean", "sd"))
-        }
-    } else {
-        posttimes <- x$s$inftimes[, (1:samplesize) + chainlength - samplesize]
-        time.out <- apply(posttimes, 1, quantile, probs = time.quantiles)
-        cnames <- paste0("inf.times.Q", 100 * time.quantiles)
-    }
-    if(inherits(x$d$reference.date, "Date")) {
-      time.out <- as.Date(time.out, origin = x$d$reference.date)
-    } else {
-      time.out <- time.out + x$d$reference.date
-    }
-    time.out <- as.data.frame(split(time.out, 1:length(cnames)))
-    colnames(time.out) <- cnames
-    
-    ### return the result
+  }
+  
+  ### initialization
+  samplesize <- min(samplesize, chainlength)
+  nsamples <- x$d$nsamples
+  obs <- x$p$obs
+  res <- c()
+  
+  ### decision tree to use correct model
+  if (method[1] == "count") {
+      res <- .transtreecount(x, samplesize, infection.times[1] == "infector.sd")
+  }
+  if (method[1] == "edmonds") {
+      res <- .transtreeedmonds(x, samplesize, infection.times[1] == "infector.sd")
+  }
+  if (method[1] == "mpc") {
+      res <- .mpcinfector(x, samplesize, phylo.class, infection.times[1] == "infector.sd")
+      
+      if(!phylo.class) {
+        besttree <- res[[2]]
+        res <- res[[1]]
+      }
+      if (phylo.class) 
+          return(get.phylo(x, samplenr = res, simmap = TRUE))
+  }
+  if (method[1] == "mtcc") {
+      res <- .mtcctree(x$s$infectors[, (1:samplesize) + chainlength - samplesize], 
+                       x$s$inftimes[, (1:samplesize) + chainlength - samplesize], c(obs, samplesize))
+      if (phylo.class) 
+          return(get.phylo(x, samplenr = tail(res, 1) + chainlength - samplesize, simmap = TRUE))
+      res <- matrix(head(res, -1), ncol = 5)
+  }
+  # if(method[1] == 'cc.construct') { res <- matrix(.CCtranstreeconstruct( x$s$nodehosts[obs:(2*obs-1),
+  # (1:samplesize) + chainlength - samplesize], x$s$nodetimes[obs:(2*obs-1), (1:samplesize) + chainlength -
+  # samplesize], c(obs, samplesize) ), ncol = 4) } test: no correct method provided
+  if (length(res) == 0) {
+      stop("incorrect method provided, choose \"count\", \"edmonds\",
+       \"mpc\", or \"mtcc\"")
+  }
+  
+  ### build output infectors
+  if (infector.name) {
+    infectors.out <- matrix(c("index", x$d$hostnames)[1 + res[, 1]], ncol = 1, dimnames = list(x$d$hostnames[1:obs], 
+                                                                                               "infector"))
+  } else {
+    infectors.out <- matrix(res[, 1], ncol = 1, dimnames = list(x$d$hostnames[1:obs], "infector"))
+  }
+  # support
+  if (support[1] == "count") {
+      support.out <- res[, 2]
+  } else {
+      support.out <- res[, 2]/samplesize
+  }
+  # times
+  if (infection.times[1] == "infector") {
+      posttimes <- x$s$inftimes[, (1:samplesize) + chainlength - samplesize]
+      posttimes[res[, 1] != x$s$infectors[, (1:samplesize) + chainlength - samplesize]] <- NA
+      time.out <- apply(posttimes, 1, quantile, probs = time.quantiles, na.rm = TRUE)
+      cnames <- paste0("inf.times.Q", 100 * time.quantiles)
+  } else if (infection.times[1] == "infector.sd") {
+      if (method[1] == "mpc" || method[1] == "mtcc") {
+          time.out <- res[, 3:5]
+          cnames <- paste0("inf.times.", c("mean", "sd", "mc.tree"))
+      } else {
+          time.out <- res[, 3:4]
+          cnames <- paste0("inf.times.", c("mean", "sd"))
+      }
+  } else {
+      posttimes <- x$s$inftimes[, (1:samplesize) + chainlength - samplesize]
+      time.out <- apply(posttimes, 1, quantile, probs = time.quantiles)
+      cnames <- paste0("inf.times.Q", 100 * time.quantiles)
+  }
+  if(inherits(x$d$reference.date, "Date")) {
+    time.out <- as.Date(time.out, origin = x$d$reference.date)
+  } else {
+    time.out <- time.out + x$d$reference.date
+  }
+  time.out <- as.data.frame(split(time.out, 1:length(cnames)))
+  colnames(time.out) <- cnames
+  
+  ### return the result
+  if (show.besttree) {
+    return(besttree)
+  } else { 
     return(data.frame(infectors = infectors.out, support = support.out, time.out))
+  }
 }
 
 
@@ -185,21 +201,25 @@ transtree <- function(x, method = c("count", "edmonds", "mpc", "mtcc"), samplesi
 ### with multiple root candidates, plus (if requested) means and standard deviations of infection times called by transtree
 ### calls: .edmondsiterative
 .transtreeedmonds <- function(x, samplesize, includetimes) {
-    ### initialize some constants
-    chainlength <- length(x$s$mu)
-    nsamples <- x$d$nsamples
-    obsize <- x$p$obs
-    samplerange <- (chainlength - samplesize + 1):chainlength
-    
-    ### obtaining the result in steps
-    
-    # matrix with support for each infector (row) per host (column), with 0 as maximum, and a column for the index
-    supportmatrix <- cbind(c(0, rep(-1, obsize)), apply(1 + x$s$infectors[, samplerange], 
-        1, tabulate, nbins = obsize + 1))
-    maxsupportperhost <- apply(supportmatrix, 2, max)
-    supportmatrix <- supportmatrix - rep(maxsupportperhost, each = obsize + 1)
-    maxsupportperhost <- maxsupportperhost[-1]
-    
+  ### initialize some constants
+  chainlength <- length(x$s$mu)
+  nsamples <- x$d$nsamples
+  obsize <- x$p$obs
+  samplerange <- (chainlength - samplesize + 1):chainlength
+  
+  ### obtaining the result in steps
+  
+  # matrix with support for each infector (row) per host (column), with 0 as maximum, and a column for the index
+  supportmatrix <- cbind(c(0, rep(-1, obsize)), apply(1 + x$s$infectors[, samplerange], 
+                                                      1, tabulate, nbins = obsize + 1))
+  maxsupportperhost <- apply(supportmatrix, 2, max)
+  supportmatrix <- supportmatrix - rep(maxsupportperhost, each = obsize + 1)
+  maxsupportperhost <- maxsupportperhost[-1]
+  
+  if(x$p$mult.intro) {
+    besttree <- .edmondsiterative(supportmatrix, samplesize, obsize)[-1] - 1
+    treesupport <- rowSums(x$s$infectors[, samplerange] == besttree)
+  } else {
     # vector with hosts, ordered by support to be index, and vector with these supports
     candidateindex <- order(apply(x$s$infectors[, samplerange] == 0, 1, sum), decreasing = TRUE)
     indexsupports <- apply(x$s$infectors[, samplerange] == 0, 1, sum)[candidateindex]
@@ -214,24 +234,24 @@ transtree <- function(x, method = c("count", "edmonds", "mpc", "mtcc"), samplesi
     treesupports <- c()
     # then make trees as long as bestYN == FALSE
     while (!bestYN) {
-        # make copy of supportmatrix, maximally supporting the next candidate index
-        suppmat <- supportmatrix
-        suppmat[1, ] <- -samplesize
-        suppmat[1, candidateindex[nextcandidate] + 1] <- 0
-        
-        # make the tree
-        thistree <- .edmondsiterative(suppmat, samplesize, obsize)[-1] - 1
-        alltrees <- c(alltrees, thistree)
-        thissupport <- rowSums(x$s$infectors[, samplerange] == thistree)
-        allsupports <- c(allsupports, thissupport)
-        treesupports <- c(treesupports, sum(thissupport))
-        
-        # test if next candidate index must result in lower tree support only by its own loss in support
-        nextcandidate <- nextcandidate + 1
-        highestsupportthusfar <- max(treesupports)
-        maxsupportwithnextcandidate <- sum(maxsupportperhost[-candidateindex[nextcandidate]]) + 
-          indexsupports[candidateindex[nextcandidate]]
-        if(highestsupportthusfar > maxsupportwithnextcandidate || nextcandidate > obsize) bestYN <- TRUE
+      # make copy of supportmatrix, maximally supporting the next candidate index
+      suppmat <- supportmatrix
+      suppmat[1, ] <- -samplesize
+      suppmat[1, candidateindex[nextcandidate] + 1] <- 0
+      
+      # make the tree
+      thistree <- .edmondsiterative(suppmat, samplesize, obsize)[-1] - 1
+      alltrees <- c(alltrees, thistree)
+      thissupport <- rowSums(x$s$infectors[, samplerange] == thistree)
+      allsupports <- c(allsupports, thissupport)
+      treesupports <- c(treesupports, sum(thissupport))
+      
+      # test if next candidate index must result in lower tree support only by its own loss in support
+      nextcandidate <- nextcandidate + 1
+      highestsupportthusfar <- max(treesupports)
+      maxsupportwithnextcandidate <- sum(maxsupportperhost[-candidateindex[nextcandidate]]) + 
+        indexsupports[candidateindex[nextcandidate]]
+      if(highestsupportthusfar > maxsupportwithnextcandidate || nextcandidate > obsize) bestYN <- TRUE
     }
     
     # find the tree with maximum support
@@ -239,18 +259,20 @@ transtree <- function(x, method = c("count", "edmonds", "mpc", "mtcc"), samplesi
     dim(allsupports) <- dim(alltrees)
     besttree <- alltrees[, which(colSums(allsupports) == max(colSums(allsupports)))]
     treesupport <- allsupports[, which(colSums(allsupports) == max(colSums(allsupports)))]
-    res <- matrix(c(besttree, treesupport), ncol = 2)
-    
-    ### get time summaries
-    if (includetimes) {
-        timesums <- with(x, rowSums(s$inftimes[, samplerange] * (s$infectors[, samplerange] == res[, 1])))
-        timesumsqs <- with(x, rowSums((s$inftimes[, samplerange]^2) * (s$infectors[, samplerange] == res[, 1])))
-        res <- cbind(res, timesums/res[, 2])
-        res <- cbind(res, sqrt((timesumsqs - res[, 3]^2 * res[, 2])/(res[, 2] - 1)))
-    }
-    
-    ### return result
-    return(res)
+  }
+  
+  res <- matrix(c(besttree, treesupport), ncol = 2)
+  
+  ### get time summaries
+  if (includetimes) {
+    timesums <- with(x, rowSums(s$inftimes[, samplerange] * (s$infectors[, samplerange] == res[, 1])))
+    timesumsqs <- with(x, rowSums((s$inftimes[, samplerange]^2) * (s$infectors[, samplerange] == res[, 1])))
+    res <- cbind(res, timesums/res[, 2])
+    res <- cbind(res, sqrt((timesumsqs - res[, 3]^2 * res[, 2])/(res[, 2] - 1)))
+  }
+  
+  ### return result
+  return(res)
 }
 
 
@@ -260,7 +282,7 @@ transtree <- function(x, method = c("count", "edmonds", "mpc", "mtcc"), samplesi
     ### initialize some constants
     chainlength <- length(x$s$mu)
     nsamples <- x$d$nsamples
-    obsize <- x$p$obs
+    obsize <- ifelse(x$p$obs == nrow(x$s$infectors), x$p$obs, x$p$obs+1)
     samplerange <- (chainlength - samplesize + 1):chainlength
     posteriorsamples <- x$s$infectors[, samplerange]
     
@@ -289,7 +311,7 @@ transtree <- function(x, method = c("count", "edmonds", "mpc", "mtcc"), samplesi
     }
     
     
-    return(res)
+    return(list(res, besttree))
 }
 
 

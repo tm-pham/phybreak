@@ -20,7 +20,9 @@ update_mu <- function() {
     propose_pbe("mu")
     
     ### calculate acceptance probability
-    logaccprob <- pbe1$logLikseq - pbe0$logLikseq
+    logaccprob <- pbe1$logLikseq - pbe0$logLikseq +
+      dnorm(pbe1$p$mu, mean = h$mu.av, sd = h$mu.sd, log = TRUE) - 
+      dnorm(pbe0$p$mu, mean = h$mu.av, sd = h$mu.sd, log = TRUE)
     
     ### accept or reject
     if (runif(1) < exp(logaccprob)) {
@@ -41,7 +43,7 @@ update_mS <- function() {
     v <- pbe1$v
     
     ### change to proposal state
-    sumst <- sum(v$nodetimes[v$nodetypes == "s"] - v$inftimes)
+    sumst <- sum(v$nodetimes[v$nodetypes == "s"] - v$inftimes[v$nodehosts[v$nodetypes == "s"]])
     p$sample.mean <- p$sample.shape/rgamma(1, shape = p$sample.shape * p$obs + 2 + (h$mS.av/h$mS.sd)^2, rate = sumst + (h$mS.av/p$sample.shape) * 
          (1 + (h$mS.av/h$mS.sd)^2))
 
@@ -60,7 +62,6 @@ update_mS <- function() {
     }
 }
 
-
 update_mG <- function() {
     ### create an up-to-date proposal-environment
     prepare_pbe()
@@ -75,8 +76,9 @@ update_mG <- function() {
     ### change to proposal state
     sumgt <- sum(v$inftimes[v$infectors != 0] - 
                    v$inftimes[v$infectors])
+    nrof_indices <- sum(v$infectors == 0)
     p$gen.mean <- p$gen.shape/rgamma(1, 
-                                     shape = p$gen.shape * (p$obs - 1) + 2 + (h$mG.av/h$mG.sd)^2, 
+                                     shape = p$gen.shape * (p$obs - nrof_indices) + 2 + (h$mG.av/h$mG.sd)^2, 
                                      rate = sumgt + (h$mG.av/p$gen.shape) * (1 + (h$mG.av/h$mG.sd)^2))
     
     ### update proposal environment
@@ -89,6 +91,72 @@ update_mG <- function() {
     accept_pbe("mG")
 }
 
+update_ir <- function() {
+  ### create an up-to-date proposal-environment
+  prepare_pbe()
+  
+  ### making variables and parameters available within the function
+  le <- environment()
+  h <- pbe0$h
+  p <- pbe1$p
+  v <- pbe1$v
+  
+  p$intro.rate <- exp(log(p$intro.rate) + rnorm(1, 0, h$si.ir))
+  # 
+  
+  ### update proposal environment
+  copy2pbe1("p", le)
+  
+  ### calculate proposalratio
+  logproposalratio <- log(p$intro.rate) - log(pbe0$p$intro.rate)
+  
+  ### calculate likelihood
+  propose_pbe("ir")
+  
+  ### calculate acceptance probability
+  logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio + 
+    dgamma(pbe1$p$intro.rate, shape = h$ir.sh, scale = h$ir.av/h$ir.sh, log = TRUE) - 
+    dgamma(pbe0$p$intro.rate, shape = h$ir.sh, scale = h$ir.av/h$ir.sh, log = TRUE)
+  
+  ### accept
+  if (runif(1) < exp(logaccprob)) {
+    accept_pbe("ir")
+  }
+}
+
+update_wh_history <- function(){
+    ### create an up-to-date proposal-environment
+    prepare_pbe()
+    
+    ### making variables and parameters available within the function
+    le <- environment()
+    h <- pbe0$h
+    p <- pbe1$p
+    v <- pbe1$v
+    
+    ### change to proposal state
+    p$wh.history <- exp(log(p$wh.history) + rnorm(1, 0, h$si.wh))
+    #if (p$wh.history > 1) return()
+    
+    ### update proposal environment
+    copy2pbe1("p", le)
+    
+    ### calculate proposalratio
+    logproposalratio <- log(p$wh.history) - log(pbe0$p$wh.history)
+    
+    ### calculate likelihood
+    propose_pbe("wh.history")
+    
+    ### calculate acceptance probability
+    logaccprob <- pbe1$logLikcoal - pbe0$logLikcoal + logproposalratio + 
+      dgamma(pbe1$p$wh.history, shape = h$wh.h.sh, scale = h$wh.h.av/h$wh.h.sh, log = TRUE) - 
+      dgamma(pbe0$p$wh.history, shape = h$wh.h.sh, scale = h$wh.h.av/h$wh.h.sh, log = TRUE)
+    
+    ### accept or reject
+    if (runif(1) < exp(logaccprob)) {
+      accept_pbe("wh.history")
+    }
+}
 
 update_wh_slope <- function() {
     ### create an up-to-date proposal-environment

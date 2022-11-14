@@ -34,8 +34,10 @@
 #' logLik(MCMCstate, genetic = TRUE, withinhost = FALSE, 
 #'        sampling = FALSE, generation = FALSE) #should give the same result as 'pml'
 #' @export
-logLik.phybreak <- function(object, genetic = TRUE, withinhost = TRUE, sampling = TRUE, generation = TRUE, 
+logLik.phybreak <- function(object, genetic = TRUE, withinhost = TRUE, sampling = TRUE,
+                            generation = TRUE, 
                             distance = TRUE, ...) {
+  
   res <- 0
   if (genetic) {
     res <- res + with(object, .likseq(matrix(unlist(d$sequences), ncol = d$nsamples), 
@@ -43,7 +45,7 @@ logLik.phybreak <- function(object, genetic = TRUE, withinhost = TRUE, sampling 
                                       v$nodeparents, v$nodetimes, p$mu, d$nsamples))
   }
   if (generation) {
-    res <- res + with(object, lik_gentimes(p$gen.shape, p$gen.mean, v$inftimes, v$infectors))
+    res <- res + with(object, lik_gentimes(list(p = p, v = v)))
   }
   if (sampling) {
     res <- res + with(object, lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes))
@@ -60,7 +62,7 @@ logLik.phybreak <- function(object, genetic = TRUE, withinhost = TRUE, sampling 
   attributes(res) <- list(
     nobs = object$p$obs,
     df = 1 + object$h$est.mG + object$h$est.mS + object$h$est.wh.s + object$h$est.wh.e + object$h$est.wh.0 +
-      object$h$est.dist.e + object$h$est.dist.s + object$h$est.dist.m,
+      object$h$est.wh.h + object$h$est.dist.e + object$h$est.dist.s + object$h$est.dist.m,
     genetic = genetic, withinhost = withinhost, sampling = sampling, generation = generation, distance = distance
   )
   class(res) <- "logLik"
@@ -69,10 +71,33 @@ logLik.phybreak <- function(object, genetic = TRUE, withinhost = TRUE, sampling 
 
 
 ### calculate the log-likelihood of generation intervals 
-lik_gentimes <- function(shapeG, meanG, inftimes, infectors) {
-  sum(dgamma(inftimes[infectors > 0] - 
-               inftimes[infectors[infectors > 0]], 
-             shape = shapeG, scale = meanG/shapeG, log = TRUE))
+# lik_gentimes <- function(shapeG, meanG, sampleScale, cullingScale, transModel, inftimes, infectors,
+#                          nodetimes, cultimes) {
+lik_gentimes <- function(le){
+  p <- le$p
+  v <- le$v
+  indices <- v$infectors == 0
+  othercases <- v$infectors > 0
+  
+  # if(length(v$inftimes) != sum(v$nodetypes=="s"))
+  #   0 + # force of infection from external source
+  #   sum(infect_distribution(v$inftimes[v$infectors > 1],
+  #                             v$inftimes[v$infectors[v$infectors > 1]],
+  #                           nodetimes = v$nodetimes[v$nodetypes=="s"][v$infectors[v$infectors>1]-1],
+  #                           cultimes = v$cultimes[v$infectors[v$infectors>1]],
+  #                           p = p,
+  #                           log = TRUE))
+  # else 
+  #print(infect_distribution())
+  return(  0 + # force of infection from external source
+      sum(dexp(diff(c(sort(v$inftimes[indices]), max(v$nodetimes))), rate = p$intro.rate, log = TRUE)) -
+      #log(p$intro.rate^(length(v$inftimes))*exp(-p$intro.rate*(max(v$nodetimes) - min(v$inftimes)))) -
+      log(p$intro.rate) +
+      sum(infect_distribution(time = v$inftimes[othercases],
+                              inftimes = v$inftimes[v$infectors[othercases]],
+                              nodetimes = v$nodetimes[v$nodetypes=="s"][v$infectors[othercases]],
+                              le = le,
+                              log = TRUE)))
 }
 
 ### calculate the log-likelihood of sampling intervals 
@@ -96,6 +121,11 @@ lik_distances <- function(dist.model, dist.exponent, dist.scale, dist.mean, infe
            -dist.mean + distancevector * log(dist.mean) - lgamma(1 + distancevector)
          )
   )
+}
+
+### calculate the log-likelihood of introductions
+lik_introductions <- function(hist.mean, intro, time) {
+  sum(c(dpois(intro, hist.mean, log = TRUE), log(factorial(intro)), log((1/time)^(intro-1)), log(1/hist.mean)))
 }
 
 ### calculate the log-likelihood of coalescent intervals 
@@ -126,6 +156,64 @@ lik_coaltimes <- function(phybreakenv) {
   nrlineages <- 1 + cumsum(dlineage)
   
   whtimes <- nodetimes[orderednodes] - inftimes[orderedhosts + 1]
+  if(phybreakenv$p$mult.intro) whtimes[orderedhosts == 0] <- whtimes[orderedhosts == 0] - min(whtimes[orderedhosts == 0])
+  whtimes[c(!duplicated(orderedhosts)[-1], FALSE)] <- 0
+  
+  logcoalrates <- switch(phybreakenv$p$wh.model, single =, infinite =,
+                         linear = -log(phybreakenv$p$wh.level + phybreakenv$p$wh.slope * whtimes[coalnodes]),
+                         exponential = 
+                           -log(phybreakenv$p$wh.level * 
+                                  exp(phybreakenv$p$wh.exponent * 
+                                        whtimes[coalnodes])),
+                         constant = -log(phybreakenv$p$wh.level) * coalnodes)
+  cumcoalrates <- switch(phybreakenv$p$wh.model, single =, infinite=,
+                       linear = log(whtimes + phybreakenv$p$wh.level/phybreakenv$p$wh.slope + 
+                                      ((whtimes + phybreakenv$p$wh.level/phybreakenv$p$wh.slope) == 0)) / phybreakenv$p$wh.slope,
+                       exponential  = -1/(phybreakenv$p$wh.level * phybreakenv$p$wh.exponent * 
+                                            exp(phybreakenv$p$wh.exponent * whtimes)),
+                       constant = whtimes/phybreakenv$p$wh.level)
+  if (phybreakenv$p$mult.intro) {
+    logcoalrates[orderedhosts[coalnodes] == 0] <- -log(phybreakenv$p$wh.history)
+    cumcoalrates[orderedhosts == 0] <- whtimes[orderedhosts == 0]/phybreakenv$p$wh.history
+  }
+  
+  coalratediffs <- cumcoalrates - c(0, head(cumcoalrates, -1))
+  logcoalescapes <- -coalratediffs * choose(nrlineages, 2)
+  
+  return(sum(logcoalrates) + sum(logcoalescapes))
+}
+
+### replacement proposed for lik_coaltimes
+# to be used with original style phybreak object, ie without history host in v$inftimes or v$infectors
+# to be used with original phybreak2environment (called in logLik.phybreak)
+lik_coaltimes_new <- function(phybreakenv) {
+  if (phybreakenv$p$wh.model %in% c(1, 2, "single", "infinite")) 
+    return(0)
+  
+  if(phybreakenv$p$wh.model == "linear" && phybreakenv$p$wh.bottleneck == "wide") {
+    if(min(phybreakenv$v$inftimes) - min(phybreakenv$v$nodetimes[phybreakenv$v$nodetypes == "c"]) > 
+       phybreakenv$p$sample.mean + phybreakenv$p$wh.level/phybreakenv$p$wh.slope) return(-Inf)
+  }
+  
+  remove0nodes <- phybreakenv$v$nodetypes != "0"
+  nodetypes <- phybreakenv$v$nodetypes[remove0nodes]
+  nodehosts <- phybreakenv$v$nodehosts[remove0nodes]
+  nodetimes <- phybreakenv$v$nodetimes[remove0nodes]
+  inftimes <- c(min(phybreakenv$v$inftimes) - phybreakenv$p$sample.mean, phybreakenv$v$inftimes)
+  
+  coalnodes <- nodetypes == "c"
+  orderednodes <- order(nodehosts, nodetimes)
+  
+  coalnodes <- coalnodes[orderednodes]
+  orderedhosts <- nodehosts[orderednodes]
+  
+  bottlenecks <- sapply(0:phybreakenv$p$obs, function(i) sum((orderedhosts == i) * (1 - 2 * coalnodes))) - 1
+  dlineage <- 2 * c(FALSE, head(coalnodes, -1)) - 1
+  dlineage[!duplicated(orderedhosts)] <- bottlenecks
+  nrlineages <- 1 + cumsum(dlineage)
+  
+  whtimes <- nodetimes[orderednodes] - inftimes[orderedhosts + 1]
+  if(phybreakenv$p$hist) whtimes[orderedhosts == 0] <- whtimes[orderedhosts == 0] - min(whtimes[orderedhosts == 0])
   whtimes[c(!duplicated(orderedhosts)[-1], FALSE)] <- 0
   
   logcoalrates <- switch(phybreakenv$p$wh.model, single =, infinite =,
@@ -141,6 +229,12 @@ lik_coaltimes <- function(phybreakenv) {
                          exponential  = -1/(phybreakenv$p$wh.level * phybreakenv$p$wh.exponent * 
                                               exp(phybreakenv$p$wh.exponent * whtimes)),
                          constant = whtimes/phybreakenv$p$wh.level)
+  if(phybreakenv$p$hist) {
+    logcoalrates[orderedhosts[coalnodes] == 0] <- -log(phybreakenv$p$wh.history) 
+    cumcoalrates[orderedhosts == 0] <- whtimes[orderedhosts == 0]/phybreakenv$p$wh.history
+  }
+  
+  
   coalratediffs <- cumcoalrates - c(0, head(cumcoalrates, -1))
   logcoalescapes <- -coalratediffs * choose(nrlineages, 2)
   
@@ -211,11 +305,13 @@ lik_topology_host <- function(phybreakenv, hostID) {
   coalnodes <- coalnodes[orderednodes]
   
   bottlenecks <- sum(1 - 2 * coalnodes) - 1
-  dlineage <- 2 * c(FALSE, head(coalnodes, -1)) - 1
+  #dlineage <- 2 * c(FALSE, head(coalnodes, -1)) - 1
+  dlineage <- 2 * c(FALSE, coalnodes[1:(length(coalnodes)-1)]) - 1
   dlineage[1] <- bottlenecks
   nrlineages <- 1 + cumsum(dlineage)
   
-  logcoalprobabilities <- -log(choose(nrlineages[c(FALSE, head(coalnodes, -1))], 2))
+  #logcoalprobabilities <- -log(choose(nrlineages[c(FALSE, head(coalnodes, -1))], 2))
+  logcoalprobabilities <- -log(choose(nrlineages[c(FALSE, coalnodes[1:(length(coalnodes)-1)])], 2))
   
   return(sum(logcoalprobabilities))
 }

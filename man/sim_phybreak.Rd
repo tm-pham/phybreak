@@ -5,13 +5,33 @@
 \alias{sim.phybreak}
 \title{Outbreak simulation.}
 \usage{
-sim_phybreak(obsize = 50, popsize = NA, samplesperhost = 1,
-  R0 = 1.5, spatial = FALSE, gen.shape = 10, gen.mean = 1,
-  sample.shape = 10, sample.mean = 1, additionalsampledelay = 0,
-  wh.model = "linear", wh.bottleneck = "auto", wh.slope = 1,
-  wh.exponent = 1, wh.level = 0.1, dist.model = "power",
-  dist.exponent = 2, dist.scale = 1, mu = 1e-04,
-  sequence.length = 10000, ...)
+sim_phybreak(
+  obsize = 50,
+  popsize = NA,
+  samplesperhost = 1,
+  introductions = 1,
+  intro.rate = 1,
+  outbreak.duration = 10,
+  R0 = 1.5,
+  spatial = FALSE,
+  gen.shape = 10,
+  gen.mean = 1,
+  sample.shape = 10,
+  sample.mean = 1,
+  additionalsampledelay = 0,
+  wh.model = "linear",
+  wh.bottleneck = "auto",
+  wh.slope = 1,
+  wh.exponent = 1,
+  wh.level = 0.1,
+  wh.history = 100,
+  dist.model = "power",
+  dist.exponent = 2,
+  dist.scale = 1,
+  mu = 1e-04,
+  sequence.length = 10000,
+  ...
+)
 
 sim.phybreak(...)
 }
@@ -23,6 +43,11 @@ an optimal population size will be chosen based on R0 and obsize. Be aware that 
 an \code{obsize} can severely increase the simulation time, depending on \code{R0}.}
 
 \item{samplesperhost}{Number of samples to be taken per host, either a vector or a single number.}
+
+\item{introductions}{The number of index cases when simulating a multiple introduced outbreak.}
+
+\item{intro.rate}{The rate in which introductions appear. The \code{intro.rate} is the parameter of the exponential waiting time distribution between the 
+introductions.}
 
 \item{R0}{The basic reproduction ratio used for simulation. The offspring distribution is Poisson.}
 
@@ -60,6 +85,8 @@ Options are:
 
 \item{wh.level}{Within-host effective pathogen size at transmission, used if \code{wh.bottleneck = "wide"}
 (if \code{wh.model = "exponential"} or \code{"constant"}, and optional if \code{wh.model = "linear"})}
+
+\item{wh.history}{Within-host coalescent rate of the history host. Rate = 1/\code{wh.history}.}
 
 \item{dist.model}{The distance kernel to use if \code{spatial = TRUE}. Options are:
 \enumerate{

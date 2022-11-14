@@ -73,10 +73,16 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
   
   if(inherits(x, "phybreakdata")) {
     if(exists("sim.infection.times", x) && exists("sim.infectors", x)) {
+      # if(length(x$sample.hosts) != length(x$sim.infectors)){
+      #   x$sim.infection.times <- x$sim.infection.times[-1]
+      #   x$sim.infectors <- x$sim.infectors[-1]
+      #   x$sim.infectors[x$sim.infectors=="history"] <- "index" 
+      # }
       vars <- x
       names(vars$sample.times) <- vars$sample.hosts
       tg.mean <- NA
       tg.shape <- NA
+      ttrans <- NULL
     } else {
       stop("object x should contain sim.infection.times and sim.infectors")
     }
@@ -95,6 +101,9 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
     if (plot.which != "sample") {
       tree2plot <- suppressWarnings(transtree(x, plot.which, 
                                               infection.times = "infector", time.quantiles = 0.5))
+      # tree2plot$infector[tree2plot$infector=="history"] <- "index"
+      # tree2plot <- tree2plot[-1,]
+      
       vars <- list(sample.times = x$d$sample.times,
                    sample.hosts = x$d$hostnames,
                    sim.infection.times = tree2plot[, 3],
@@ -109,17 +118,32 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       }
       tg.mean <- median(x$s$mG)
       tg.shape = x$p$gen.shape
+      ttrans <- list(trans.model = x$p$trans.model,
+                     trans.sample = median(x$s$tS),
+                     trans.init = x$p$trans.init,
+                     trans.culling = x$p$trans.culling,
+                     trans.growth = median(x$s$tG))
     } else if (samplenr == 0) {
       # plot.which == "sample"
-      
-      vars <- phybreak2trans(x$v, x$d$hostnames, x$d$reference.date)
+      # if(x$p$obs != length(x$v$inftimes))
+      #   x$v <- remove_history(x)
+      vars <- phybreak2trans(x$v, x$d$hostnames, x$d$reference.date,
+                             x$d$culling.times)
       if(is.null(arrow.col)) {
         arrow.col <- "black"
       } else {
         arrow.col <- arrow.col[1]
       }
+      
       tg.mean <- x$p$gen.mean
-      tg.shape = x$p$gen.shape
+      tg.shape <- x$p$gen.shape
+      trans.sample = x$p$trans.sample
+      trans.growth = x$p$trans.growth
+      ttrans <- list(trans.model = x$p$trans.model,
+                     trans.sample = trans.sample,
+                     trans.init = x$p$trans.init,
+                     trans.culling = x$p$trans.culling,
+                     trans.growth = trans.growth)
     } else {
       # plot.which == "sample" && samplenr > 0
       
@@ -131,7 +155,11 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
         inftimes = x$s$inftimes[, samplenr],
         infectors = x$s$infectors[, samplenr]
       )
-      vars <- phybreak2trans(vars, unique(x$d$hostnames), x$d$reference.date)
+      # x$v <- vars
+      # vars <- remove_history(x)
+      
+      vars <- phybreak2trans(vars, unique(x$d$hostnames), x$d$reference.date,
+                             x$d$culling.times)
       if(is.null(arrow.col)) {
         arrow.col <- "black"
       } else {
@@ -139,9 +167,15 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       }
       tg.mean <- x$s$mG[samplenr]
       tg.shape = x$p$gen.shape
+      ttrans <- list(trans.model = x$p$trans.model,
+                     trans.sample = x$s$tS[samplenr],
+                     trans.init = x$p$trans.init,
+                     trans.culling = x$p$trans.culling,
+                     trans.growth = x$s$tG[samplenr])
     }
   }
-  maketransplot(vars, tg.mean = tg.mean, tg.shape = tg.shape, mar = mar, label.cex = label.cex, 
+  maketransplot(vars, tg.mean = tg.mean, tg.shape = tg.shape, ttrans = ttrans,
+                mar = mar, label.cex = label.cex, 
                 label.space = label.space, label.adj = label.adj,
                 arrow.lwd = arrow.lwd, arrow.length = arrow.length, arrow.col = arrow.col, 
                 sample.pch = sample.pch, sample.lwd = sample.lwd, sample.cex = sample.cex, 
@@ -149,10 +183,10 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
                 xlab = xlab, axis.cex = axis.cex, title.cex = title.cex, ...)
 }
 
-maketransplot <- function(x, tg.mean = NA, tg.shape = NA, mar = 0.1 + c(4, 0, 0, 0), label.cex = NULL, 
+maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0.1 + c(4, 0, 0, 0), label.cex = NULL, 
                           label.space = 0.15, label.adj = 0,
                           arrow.lwd = 1, arrow.length = NULL, arrow.col = par("fg"), sample.pch = 4,
-                          sample.lwd = NULL, sample.cex = label.cex, polygon.col = "gray", 
+                          sample.lwd = NULL, sample.cex = label.cex, culling.pch = 7, polygon.col = "gray", 
                           polygon.border = NA, line.lty = 3, xlab = "Time", 
                           axis.cex = 1, title.cex = 1, ...) {
   oldmar <- par("mar")
@@ -180,7 +214,8 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, mar = 0.1 + c(4, 0, 0,
   
   timedorder <- order(head(ordertimes, -1))
   inftimes <- x$sim.infection.times[timedorder]
-  samtimes <- x$sample.times
+  samtimes <- x$sample.times[timedorder]
+  cultimes <- userenv$culling.times[timedorder]
   infectors <- x$sim.infectors[timedorder]
   arrow.colours <- arrow.colours[timedorder]
   hosts <- names(inftimes)
@@ -201,7 +236,17 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, mar = 0.1 + c(4, 0, 0,
   tgvar <- if(is.na(tg.shape)) as.numeric(var(inftimes - inftimes[infectors], na.rm = T)) else NA
   tgscale <- if(is.na(tg.shape)) tgvar/tgmean else tgmean/tg.shape
   tgshape <- if(is.na(tg.shape)) tgmean/tgscale else tg.shape
-  maxwd <- dgamma(max(0, tgscale * (tgshape - 1)), shape = tgshape, scale = tgscale)
+  if(length(ttrans)==0 || ttrans$trans.model == "gamma") {
+    p <- list(gen.mean = tg.mean,
+              gen.shape = tg.shape,
+              trans.model = "gamma")
+    maxwd <- dgamma(max(0, tgscale * (tgshape - 1)), shape = tgshape, scale = tgscale)
+  } else {
+    p <- ttrans
+    trans.model = ttrans$trans.model  
+    maxwd = 1
+  }
+    
   obs <- length(hosts)
   
   ### some smart graphical parameters
@@ -243,7 +288,20 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, mar = 0.1 + c(4, 0, 0,
   ### Polygons and labels
   for(i in 1:obs) {
     x0s <- seq(inftimes[i], tmax - tstep, tstep)
-    widths <- abs(1 - (maxwd - dgamma(x0s - inftimes[i], shape = tgshape, scale = tgscale)) / maxwd)
+    # widths <- abs(1 - (maxwd - dgamma(x0s - inftimes[i], shape = tgshape, scale = tgscale)) / maxwd)
+    print(cultimes[i])
+    if(p$trans.model == "user-defined"){
+      widths <- sapply(x0s, function(x){
+        ifelse(x <= cultimes[i], 1, 0)
+      })
+      print(widths)
+      widths <- abs(1 - (maxwd - widths)/maxwd)
+    } else {
+    widths <- abs(1 - (maxwd - infect_distribution(x0s, inftimes[i], 
+                                                   le = list(p = p, v = list(nodetimes = samtimes,
+                                                                             cultimes = cultimes)),
+                                                   nodetimes = samtimes)) / maxwd)
+    }
     
     do.call(polygon,
             c(list(x = c(x0s, rev(x0s)),
@@ -299,14 +357,25 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, mar = 0.1 + c(4, 0, 0,
   
   ### Samples
   do.call(points,
-          c(list(x = samtimes, 
-                 y = plotrank[match(names(samtimes), hosts)],
+          c(list(x = x$sample.times, 
+                 y = plotrank[match(names(x$sample.times), hosts)],
                  pch = sample.pch, 
                  lwd = sample.lwd, 
                  cex = sample.cex),
             graphicalparameters("sample", 1, ...)
             )
           )
+  
+  ### Samples
+  do.call(points,
+          c(list(x = cultimes, 
+                 y = plotrank[match(names(cultimes), hosts)],
+                 pch = culling.pch, 
+                 lwd = sample.lwd, 
+                 cex = sample.cex),
+            graphicalparameters("sample", 1, ...)
+          )
+  )
 }
 
 rankhostsforplot <- function(hosts, infectors) {
@@ -334,24 +403,49 @@ rankhostsforplot <- function(hosts, infectors) {
   
   ### determine plot rank by placing hosts chronologically next to their infector,
   ### either at the side of the infector's infector (insideYN == Y) or at the other side
-  plotrank <- 1
-  for(i in 2:Nhosts) {
-    ior <- which(hosts == infectors[i])
-    if(infectors[ior] == "index" || infectors[ior] == 0) {
-      plotrank[i] <- plotrank[ior] + insideYN[hosts[i]] - 0.5
-    } else if(plotrank[ior] == 1) {
-      plotrank[i] <- insideYN[hosts[i]] + 0.5
-    } else if (plotrank[ior] == i - 1) {
-      plotrank[i] <- i - 0.5 - insideYN[hosts[i]]
-    } else {
-      iorior <- which(hosts == infectors[ior])
-      aboveYN <- xor((plotrank[iorior] < plotrank[ior]), insideYN[hosts[i]])
-      plotrank[i] <- plotrank[ior] + aboveYN - 0.5    
+  indices <- grep("index", infectors)
+  plotranklist <- lapply(indices, function(index){
+    subinfectors <- infectors[c(index,which(infectormatrix[,index]==1))]
+    subhosts <- hosts[c(index,which(infectormatrix[,index]==1))]
+    subYN <- insideYN[match(names(which(infectormatrix[,index]==1)),names(insideYN))]
+    plotrank <- 1
+    for(i in which(!grepl("index", subinfectors))) {
+      ior <- which(subhosts == subinfectors[i])
+      if(subinfectors[ior] == "index" || subinfectors[ior] == 0) {
+        plotrank[i] <- plotrank[ior] + subYN[subhosts[i]] - 0.5
+      } else if(plotrank[ior] == 1) {
+        plotrank[i] <- subYN[subhosts[i]] + 0.5
+      } else if (plotrank[ior] == i - 1) {
+        plotrank[i] <- i - 0.5 - subYN[subhosts[i]]
+      } else {
+        iorior <- which(subhosts == subinfectors[ior])
+        aboveYN <- xor((plotrank[iorior] < plotrank[ior]), subYN[subhosts[i]])
+        plotrank[i] <- plotrank[ior] + aboveYN - 0.5    
+      }
+      plotrank[1:i] <- rank(plotrank)[1:i]
     }
-    plotrank[1:i] <- rank(plotrank)[1:i]
+    return(list("rank"=plotrank,
+                "tree"=c(index,which(infectormatrix[,index]==1))))
+  })
+  
+  if (length(plotranklist) > 1){
+    plotrank <- rep(NA, length(hosts))
+    for (i in rev(seq_along(plotranklist))){
+      plotrank[plotranklist[[i]]$tree] <- plotranklist[[i]]$rank
+      if (i < length(plotranklist)){
+        # plotrank[plotranklist[[i-1]]$tree] <- 
+        #   plotrank[plotranklist[[i-1]]$tree] + length(plotranklist[[i]]$tree)
+        plotrank[plotranklist[[i]]$tree] <- 
+          plotrank[plotranklist[[i]]$tree] + sum(!is.na(plotrank)) - length(plotranklist[[i]]$tree)
+        
+      }
+    }
+    return(plotrank)
+  } else {
+    return(plotranklist[[1]]$rank)
   }
   
-  return(plotrank)
+  
 }
 
 

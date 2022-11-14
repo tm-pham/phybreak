@@ -18,13 +18,23 @@
 # The environments are used during MCMC-updating, and in sim_phybreak and phybreak to simulate the phylogenetic tree.
 pbe0 <- new.env()
 pbe1 <- new.env()
+userenv <- new.env()
 
 # Copy functions to phybreak environments
 copy2pbe0 <- function(var, env) {
   assign(var, get(var, env), pbe0)
 }
+copy2pbe0_2 <- function(var, env) {
+  assign(var, get(var, env), pbe0_2)
+}
 copy2pbe1 <- function(var, env) {
   assign(var, get(var, env), pbe1)
+}
+copy2pbe1_2 <- function(var, env) {
+  assign(var, get(var, env), pbe1_2)
+}
+copy2userenv <- function(var, env) {
+  assign(var, get(var, env), userenv)
 }
 
 ### build the pbe0 at the start of an mcmc chain by copying the fixed parameters and phybreak object, and by
@@ -94,12 +104,12 @@ build_pbe <- function(phybreak.obj) {
   ### complete likarray and calculate log-likelihood of sequences
   .likseqenv(le, (d$nsamples + 1):(2 * d$nsamples - 1), 1:d$nsamples)
   
-  
   ### calculate the other log-likelihoods
   logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes)
-  logLikgen <- lik_gentimes(p$gen.shape, p$gen.mean, v$inftimes, v$infectors)
+  logLikgen <- lik_gentimes(le)
   logLikcoal <- lik_coaltimes(le)
-  logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean, v$infectors, d$distances)
+  logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean, 
+                              v$infectors, d$distances)
   
   ### copy everything into pbe0
   copy2pbe0("d", le)
@@ -119,7 +129,9 @@ build_pbe <- function(phybreak.obj) {
 ### take the elements d, v, p, and h from pbe0, and s from the function arguments, and make a new phybreak-object. Then
 ### empty the environments and return the new object.  
 destroy_pbe <- function(phybreak.obj.samples) {
-  res <- list(d = pbe0$d, v = environment2phybreak(pbe0$v), p = pbe0$p, h = pbe0$h, s = phybreak.obj.samples)
+  #remove_history()
+  res <- list(d = pbe0$d, v = environment2phybreak(pbe0$v), p = pbe0$p, h = pbe0$h, s = phybreak.obj.samples,
+              hist = pbe0$v$inftimes[1])
   class(res) <- c("phybreak", "list")
   rm(list = ls(pbe0), envir = pbe0)
   rm(list = ls(pbe1), envir = pbe1)
@@ -148,6 +160,8 @@ propose_pbe <- function(f) {
   d <- pbe0$d
   v <- pbe1$v
   p <- pbe1$p
+  h <- pbe0$h
+  hostID <- pbe1$hostID
   
   if (f == "phylotrans" || f == "withinhost") {
     # identify changed nodes
@@ -175,9 +189,8 @@ propose_pbe <- function(f) {
     .likseqenv(pbe1, chnodes, nodetips)
   }
   
-  
-  if (f == "phylotrans" || f == "trans" || f == "mG") {
-    logLikgen <- lik_gentimes(p$gen.shape, p$gen.mean, v$inftimes, v$infectors)
+  if (f == "phylotrans" || f == "trans" || f == "mG" || f == "ir") {
+    logLikgen <- lik_gentimes(le)
     copy2pbe1("logLikgen", le)
   }
   
@@ -186,16 +199,22 @@ propose_pbe <- function(f) {
     copy2pbe1("logLiksam", le)
   }
   
-  if (f == "trans" || (f == "mS" && p$wh.bottleneck == "wide") || f == "wh.slope" || f == "wh.exponent" || f == "wh.level") {
+  if (f == "trans" || (f == "mS" && p$wh.bottleneck == "wide") || f == "wh.slope" || f == "wh.exponent" || f == "wh.level" || f == "wh.history") {
     logLikcoal <- lik_coaltimes(le)
     copy2pbe1("logLikcoal", le)
   }
   
   if (f == "trans" || f == "phylotrans" || f == "dist.exponent" || f == "dist.scale" || f == "dist.mean") {
     logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean,
-                                v$infectors, d$distances)
+                                v$infectors[v$infectors!=0]-1, d$distances)
     copy2pbe1("logLikdist", le)
   }
+  
+  # if (f == "phylotrans" || f == "hist.mean"){
+  #   logLikintro <- lik_introductions(p$hist.mean, sum(v$infectors == 1), 
+  #                                    max(d$sample.times) - min(v$inftimes[-1]))
+  #   copy2pbe1("logLikintro", le)
+  # }
   
   if (f == "mS" && p$wh.bottleneck == "complete") {
     copy2pbe1("logLikcoal", pbe0)
@@ -209,7 +228,8 @@ accept_pbe <- function(f) {
     copy2pbe0("v", pbe1)
   }
   
-  if(f == "mG" || f == "mS" || f == "mu" || f == "wh.slope" || f == "wh.exponent" || f == "wh.level" ||
+  if(f == "mG" || f == "mS" || f == "mu" || f == "ir" || 
+     f == "wh.slope" || f == "wh.exponent" || f == "wh.level" || f == "wh.history" ||
      f == "dist.exponent" || f == "dist.scale" || f == "dist.mean") {
     copy2pbe0("p", pbe1)
   }
@@ -223,7 +243,7 @@ accept_pbe <- function(f) {
     copy2pbe0("logLiksam", pbe1)
   }
   
-  if(f == "phylotrans" || f == "trans" || f == "mG") {
+  if(f == "phylotrans" || f == "trans" || f == "mG" || f == "ir") {
     copy2pbe0("logLikgen", pbe1)
   }
   
@@ -231,7 +251,7 @@ accept_pbe <- function(f) {
     copy2pbe0("logLikdist", pbe1)
   }
   
-  if(f == "trans" || (f == "mS" && pbe0$p$wh.bottleneck == "wide") || f == "wh.slope" || f == "wh.exponent" || f == "wh.level") {
+  if(f == "trans" || (f == "mS" && pbe0$p$wh.bottleneck == "wide") || f == "wh.slope" || f == "wh.exponent" || f == "wh.level" || f == "wh.history") {
     copy2pbe0("logLikcoal", pbe1)
   }
   
