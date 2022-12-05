@@ -67,6 +67,7 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
                          wh.history = 100,
                          dist.model = "power", dist.exponent = 2, dist.scale = 1,
                          mu = 0.0001, sequence.length = 10000, ...) {
+  
   ### parameter name compatibility 
   old_arguments <- list(...)
   if(exists("old_arguments$shape.gen")) gen.shape <- old_arguments$shape.gen
@@ -74,7 +75,7 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
   if(exists("old_arguments$shape.sample")) sample.shape <- old_arguments$shape.sample
   if(exists("old_arguments$mean.sample")) sample.mean <- old_arguments$sample.mean
 
-  
+ 
   ### tests
   if(all(is.na(c(obsize, popsize)))) {
     stop("give an outbreak size (obsize) and/or a population size (popsize)")
@@ -205,7 +206,7 @@ sim_outbreak_size_spatial <- function(obsize, Npop, R0, intronr, introrate, aG, 
 ### simulate an outbreak
 sim_outbreak <- function(Npop, intronr, introrate, duration, R0, aG, mG, aS, mS) {
   ### initialize
-  introintervals <- rexp(intronr - 1, rate = intronr/duration)
+  introintervals <- rexp(intronr - 1, rate = introrate)
   inftimes <- c(0, cumsum(introintervals), rep(10000, Npop - intronr))
   sources <- rep(0, Npop)
   nrcontacts <- rpois(Npop, R0)

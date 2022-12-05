@@ -237,8 +237,8 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
   tgscale <- if(is.na(tg.shape)) tgvar/tgmean else tgmean/tg.shape
   tgshape <- if(is.na(tg.shape)) tgmean/tgscale else tg.shape
   if(length(ttrans)==0 || ttrans$trans.model == "gamma") {
-    p <- list(gen.mean = tg.mean,
-              gen.shape = tg.shape,
+    p <- list(gen.mean = tgmean,
+              gen.shape = tgshape,
               trans.model = "gamma")
     maxwd <- dgamma(max(0, tgscale * (tgshape - 1)), shape = tgshape, scale = tgscale)
   } else {
@@ -288,8 +288,8 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
   ### Polygons and labels
   for(i in 1:obs) {
     x0s <- seq(inftimes[i], tmax - tstep, tstep)
-    # widths <- abs(1 - (maxwd - dgamma(x0s - inftimes[i], shape = tgshape, scale = tgscale)) / maxwd)
-    print(cultimes[i])
+    #widths <- abs(1 - (maxwd - dgamma(x0s - inftimes[i], shape = tgshape, scale = tgscale)) / maxwd)
+    #print(cultimes[i])
     if(p$trans.model == "user-defined"){
       widths <- sapply(x0s, function(x){
         ifelse(x <= cultimes[i], 1, 0)
@@ -298,8 +298,7 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
       widths <- abs(1 - (maxwd - widths)/maxwd)
     } else {
     widths <- abs(1 - (maxwd - infect_distribution(x0s, inftimes[i], 
-                                                   le = list(p = p, v = list(nodetimes = samtimes,
-                                                                             cultimes = cultimes)),
+                                                   le = list(p = p, v = list(nodetimes = samtimes)),
                                                    nodetimes = samtimes)) / maxwd)
     }
     

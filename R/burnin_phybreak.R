@@ -106,7 +106,7 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
   shared_heats <- heats
   
   for (rep in 1:ncycles) {
-    
+    incProgress(1/ncycles)
     if(Sys.time() - curtime > status_interval) {
       for (i in ls(envir=envirs[[1]])) copy2pbe0(i, envirs[[1]])
       print_screen_log(rep)
