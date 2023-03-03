@@ -151,7 +151,7 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
   shared_heats <- heats
   
   for (sa in tail(1:length(s.posts[[1]]$mu), nsample)) {
-    incProgress(1/length(tail(1:length(s.posts[[1]]$mu), nsample)))
+    #incProgress(1/length(tail(1:length(s.posts[[1]]$mu), nsample)))
     for (rep in 1:thin) {
       if(Sys.time() - curtime > status_interval & printlog == TRUE) {
         for (i in ls(envir=envirs[[1]])) copy2pbe0(i, envirs[[1]])
