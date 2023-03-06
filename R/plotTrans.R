@@ -294,7 +294,7 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
       widths <- sapply(x0s, function(x){
         ifelse(x <= cultimes[i], 1, 0)
       })
-      print(widths)
+
       widths <- abs(1 - (maxwd - widths)/maxwd)
     } else {
     widths <- abs(1 - (maxwd - infect_distribution(x0s, inftimes[i], 
@@ -365,16 +365,16 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
             )
           )
   
-  ### Samples
-  do.call(points,
-          c(list(x = cultimes, 
-                 y = plotrank[match(names(cultimes), hosts)],
-                 pch = culling.pch, 
-                 lwd = sample.lwd, 
-                 cex = sample.cex),
-            graphicalparameters("sample", 1, ...)
-          )
-  )
+  ### Culling
+  # do.call(points,
+  #         c(list(x = cultimes, 
+  #                y = plotrank[match(names(cultimes), hosts)],
+  #                pch = culling.pch, 
+  #                lwd = sample.lwd, 
+  #                cex = sample.cex),
+  #           graphicalparameters("sample", 1, ...)
+  #         )
+  # )
 }
 
 rankhostsforplot <- function(hosts, infectors) {
