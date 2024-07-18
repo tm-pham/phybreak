@@ -59,13 +59,14 @@
 #' @export
 sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
                          introductions = 1, intro.rate = 1, outbreak.duration = 10,
-                         R0 = 1.5, spatial = FALSE,
+                         R0 = 1.5, spatial = FALSE, contact = FALSE, contact.symmetric = TRUE, contact.probs = 1,
                          gen.shape = 10, gen.mean = 1, 
                          sample.shape = 10, sample.mean = 1,
                          additionalsampledelay = 0,
                          wh.model = "linear", wh.bottleneck = "auto", wh.slope = 1, wh.exponent = 1, wh.level = 0.1,
                          wh.history = 100,
                          dist.model = "power", dist.exponent = 2, dist.scale = 1,
+                         cnt.invest.trans = 1, cnt.invest.nontrans = 0.1, cnt.rep = 0.9, cnt.rep.false = 0,
                          mu = 0.0001, sequence.length = 10000, ...) {
   
   ### parameter name compatibility 
@@ -122,6 +123,9 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
   res <- sim_additionalsamples(res, samplesperhost, additionalsampledelay)
   res <- sim_phylotree(res, wh.model, wh.bottleneck, wh.slope, wh.exponent, wh.level, wh.history, sample.mean)
   res <- sim_sequences(res, mu, sequence.length)
+  if(contact)
+    res <- sim_contact_matrix(res, contact.symmetric, contact.probs, 
+                              cnt.invest.trans, cnt.invest.nontrans, cnt.rep, cnt.rep.false)
 
   hostnames <- paste0("host.", 1:obsize)
   samplenames <- paste0("sample.", res$nodehosts[1:res$Nsamples], ".", nthsample(res))
@@ -130,7 +134,10 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
   if(spatial) {
     rownames(res$locations) <- hostnames
   }
-
+  if(contact) {
+    rownames(res$contact.matrix) <- colnames(res$contact.matrix) <- hostnames
+  }
+  
   ### make a phylo tree
   treeout <- phybreak2phylo(vars = environment2phybreak(res), samplenames = samplenames, simmap = FALSE)
   if(spatial) {
@@ -158,7 +165,11 @@ sim_phybreak <- function(obsize = 50, popsize = NA, samplesperhost = 1,
     ))
     #toreturn$sim.hist.time <- histtime
   }
-  
+  toreturn$admission.times <- res$admissiontimes
+  if (contact){
+    toreturn$contact.matrix <- res$contact.matrix
+    toreturn$contact.categories <- res$contact.categories
+  }
   return(toreturn)
 }
 
@@ -193,7 +204,7 @@ sim_outbreak_size_spatial <- function(obsize, Npop, R0, intronr, introrate, aG, 
     while(1 - obsize/Npop < exp(-R0* obsize/Npop)) {Npop <- Npop + 1}
   } 
   
-  sim <- sim_outbreak_spatial(Npop, R0, intro, introrate, aG, mG, aS, mS, dist.model, dist.exponent, dist.scale)
+  sim <- sim_outbreak_spatial(Npop, R0, intronr, introrate, aG, mG, aS, mS, dist.model, dist.exponent, dist.scale)
   
   while(sim$obs != obsize) {
     sim <- sim_outbreak_spatial(Npop, R0, intronr, introrate, aG, mG, aS, mS, dist.model, dist.exponent, dist.scale)
@@ -210,6 +221,7 @@ sim_outbreak <- function(Npop, intronr, introrate, duration, R0, aG, mG, aS, mS)
   inftimes <- c(0, cumsum(introintervals), rep(10000, Npop - intronr))
   sources <- rep(0, Npop)
   nrcontacts <- rpois(Npop, R0)
+  admission.dates <- sort(round(runif(Npop, max = 10)))
   nth.infection <- 1
   currentID <- 1
   
@@ -223,12 +235,16 @@ sim_outbreak <- function(Npop, intronr, introrate, duration, R0, aG, mG, aS, mS)
     #who are these contacts made with?
     whocontacted <- sample(Npop, nrcontacts[currentID], replace = TRUE)
     
+    #are these contact possible, i.e. was the host present at that time?
+    #possible <- admission.dates[whocontacted] < whencontacts
+    possible <- whencontacts == whencontacts
+    
     #are these contacts successful, i.e. earlier than the existing contacts with these hosts?
     successful <- whencontacts < inftimes[whocontacted] & whencontacts < duration & whocontacted > intronr
     
     #change infectors and infection times of successful contactees
-    sources[whocontacted[successful]] <- currentID
-    inftimes[whocontacted[successful]] <- whencontacts[successful]
+    sources[whocontacted[possible & successful]] <- currentID
+    inftimes[whocontacted[possible & successful]] <- whencontacts[possible & successful]
     
     #go to next infected host in line
     nth.infection <- nth.infection + 1
@@ -247,6 +263,7 @@ sim_outbreak <- function(Npop, intronr, introrate, duration, R0, aG, mG, aS, mS)
   infectors[is.na(infectors)] <- 0
   inftimes <- inftimes[orderbysamtimes][1:obs]
   samtimes <- samtimes[orderbysamtimes][1:obs]
+  adtimes <- admission.dates[orderbysamtimes[1:obs]]
   
   
   return(
@@ -254,7 +271,8 @@ sim_outbreak <- function(Npop, intronr, introrate, duration, R0, aG, mG, aS, mS)
       obs = obs,
       samtimes = samtimes,
       inftimes = inftimes,
-      infectors = infectors
+      infectors = infectors,
+      admissiontimes = adtimes
     )
   )
 }
@@ -279,7 +297,7 @@ sim_outbreak_spatial <- function(Npop, R0, intronr, introrate, aG, mG, aS, mS, d
   introintervals <- rexp(intronr - 1, rate = introrate)
   inftimes <- c(0, cumsum(introintervals), rep(10000, Npop - intronr))
   sources <- rep(0, Npop)
-  nrcontacts <- c(intro,rpois(Npop, rowSums(R0_matrix)))
+  nrcontacts <- rpois(Npop, rowSums(R0_matrix))
   nth.infection <- 1
   currentID <- 1
   
@@ -431,6 +449,59 @@ sim_sequences <- function (sim.object, mu, sequence.length) {
   )
 }
 
+sim_contact_matrix <- function(sim.object, contact.symmetric, contact.probs, 
+                               cnt.invest.trans, cnt.invest.nontrans, cnt.rep, cnt.rep.false) {
+  with(sim.object, {
+    n = obs
+    
+    if (!is.matrix(contact.probs))
+      if (contact.probs == 1) 
+        contact.probs <- t(contact.probs)
+    
+    categories <- sample(1:nrow(contact.probs), n, replace = TRUE)
+    if (contact.symmetric){
+      if (!isSymmetric(contact.probs))
+        stop("Contact probabilities should be a symmetric matrix if contact.symmetric = TRUE")
+    }
+    
+    # transmission pair with contact
+    tp.wc <- (1-cnt.invest.trans)*cnt.rep.false + cnt.invest.trans*cnt.rep
+    # non-transmission pair with contact
+    np.wc <- (1-cnt.invest.nontrans)*cnt.rep.false + cnt.invest.nontrans*cnt.rep
+    # transmission pair no contact
+    tp.nc <- (1-cnt.invest.trans)*(1-cnt.rep.false) + cnt.invest.trans*(1-cnt.rep)
+    # non-transmission pair no contact
+    np.nc <- (1-cnt.invest.nontrans)*(1-cnt.rep.false) + cnt.invest.nontrans*(1-cnt.rep)
+    
+    mat <- matrix(0, nrow = n, ncol = n)
+    for (i in 1:(n-1)){
+      for (j in (i+1):n){
+        if (contact.symmetric){
+          if (infectors[i] == j | infectors[j] == i){
+            mat[i,j] <- sample(c(0,1), 1, prob = c(tp.nc, tp.wc) * contact.probs[categories[i],categories[j]])
+          } else {
+            mat[i,j] <- sample(c(0,1), 1, prob = c(np.nc,  np.wc) * contact.probs[categories[i],categories[j]])
+          }
+        } else {
+          if (infectors[i] == j) mat[i,j] <- sample(c(0,1), 1, prob = c(tp.nc, tp.wc) * contact.probs[categories[i],categories[j]])
+          else if (infectors[j] == i) mat[j,i] <- sample(c(0,1), 1, prob = c(tp.nc, tp.wc) * contact.probs[categories[i],categories[j]])
+          else {
+            mat[i,j] <- sample(c(0,1), 1, prob = c(np.nc, np.wc) * contact.probs[categories[i],categories[j]])
+            mat[j,i] <- sample(c(0,1), 1, prob = c(np.nc, np.wc) * contact.probs[categories[i],categories[j]])
+          }
+        }
+      }
+    }
+    if (contact.symmetric) contact <- mat + t(mat)
+    else contact <- mat
+    
+    return(within(sim.object,{
+      contact.matrix <- contact
+      contact.categories <- categories
+    }))
+  })
+}
+
 nthsample <- function(sim.object) {
   with(sim.object, {
     nth <- rep(0, Nsamples)
@@ -438,3 +509,45 @@ nthsample <- function(sim.object) {
     return(nth)
   })
 }
+
+get_contact_matrix <- function(n, tp.wc, np.wc, tp.nc, np.nc){
+  mat <- matrix(0, nrow = n, ncol = n)
+  for (i in 1:(n-1)){
+    for (j in (i+1):n){
+      if (sim$sim.infectors[i] == paste0("host.",j) | sim$sim.infectors[j] == paste0("host.",i)){
+        mat[i,j] <- sample(c(0,1), 1, prob = c(tp.nc, tp.wc))
+      } else {
+        mat[i,j] <- sample(c(0,1), 1, prob = c(np.nc,  np.wc))
+      }
+    }
+  }
+  
+  #mat[upper.tri(mat)] <- sample(c(0,1), sum(upper.tri(mat)), replace = T)
+  mat <- mat + t(mat)
+  return(mat)
+}
+
+contact_matrix_probability <- function(m, infectors, tp.wc, np.wc, tp.nc, np.nc){
+  lik <- c()
+  for(i in 1:ncol(m)){
+    for(j in 1:ncol(m)){
+      if (i != j){
+        if (infectors[j] == i | infectors[i] == j){
+          if (m[i,j] == 1){
+            lik <- c(lik, tp.wc)
+          } else{
+            lik <- c(lik, tp.nc)
+          }
+        } else {
+          if (m[i,j] == 1){
+            lik <- c(lik, np.wc)
+          } else {
+            lik <- c(lik, np.nc)
+          }
+        }
+      }
+    }
+  }
+  return(prod(lik))
+}
+

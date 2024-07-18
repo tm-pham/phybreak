@@ -75,8 +75,23 @@ plotPhylo <- function(x, plot.which = c("sample", "mpc", "mtcc", "mcc"), samplen
     simmapplot <- suppressWarnings(phybreak2phylo(x$v, x$d$names, simmap = TRUE))
   }
   phytools::plotSimmap(simmapplot, mar = par("mar"), colors = setNames(nm = unique(as.character(simmapplot$node.state))), ...)
-  rootnodetime <- x$d$reference.date + x$v$inftimes[1] + ifelse(sum(x$v$infectors == 0) > 1, min(x$v$nodetimes) - min(x$v$inftimes), simmapplot$root.edge)
-  
+  rootnodetime <- x$d$reference.date + ifelse(sum(x$v$infectors == 0) > 1, -1*get_rootnodetime(simmapplot, x$d$reference.date), 
+                                              x$v$inftimes[1] + simmapplot$root.edge)
   labs <- pretty(par("xaxp")[1:2] + rootnodetime)
   axis(1, at = labs - rootnodetime, labels = labs)
+}
+
+get_rootnodetime <- function(simplot, ref.date){
+  E <- simplot$edge
+  ord <- order(E[,2])
+  E <- E[ord,]
+  
+  rootnode <- which(!(1:max(E[,2]) %in% E[,2]))
+  E <- rbind(E[1:(rootnode-1),],
+             c(0,rootnode),
+             E[rootnode:nrow(E),])
+  edge.length <- simplot$edge.length[ord]
+  edge.length <- c(edge.length[1:(rootnode-1)], 0, edge.length[rootnode:length(edge.length)])
+  rootnodetime <- sum(edge.length[.ptr(E[,1],1)])
+  return(rootnodetime)
 }

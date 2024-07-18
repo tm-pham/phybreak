@@ -137,7 +137,6 @@ transcoaltimes <- (oldcoaltimes - inftime)/parameters$wh.level
     #frailty <- stats::rexp(1)
     frailty <- rexp(1)
   }
-  
   # calculate transformed node time
   transreturntime <- transcurtime - frailty / curnedge
   

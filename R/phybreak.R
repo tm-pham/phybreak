@@ -113,25 +113,17 @@
 #' MCMCstate <- phybreak(data = sampleSNPdata, times = sampletimedata)
 #' @export
 phybreak <- function(dataset, times = NULL, 
-         mu = NULL, gen.shape = 3, gen.mean = 1, trans.model = "gamma",
-         infectivity_file = NULL,
+         mu = NULL, gen.shape = 3, gen.mean = 1, 
          sample.shape = 3, sample.mean = 1, 
-         multiple.introductions = FALSE, introductions = 1, intro.rate = 1,
-         wh.model = "linear", wh.bottleneck = "auto", wh.history = 1, wh.slope = 1, wh.exponent = 1, wh.level = 0.1,
-         dist.model = "power", dist.exponent = 2, dist.scale = 1, dist.mean = 1,
+         wh.model = "linear", wh.bottleneck = "auto", wh.slope = 1, wh.exponent = 1, wh.level = 0.1,
          est.mu = TRUE, prior.mu.mean = 0, prior.mu.sd = 100,
          est.gen.mean = TRUE, prior.gen.mean.mean = 1, prior.gen.mean.sd = Inf,
          est.sample.mean = TRUE, prior.sample.mean.mean = 1, prior.sample.mean.sd = Inf,
-         est.intro.rate = TRUE, prior.intro.rate.mean = 1, prior.intro.rate.shape = 1,
          est.trans.growth = TRUE, est.trans.sample = TRUE, 
          est.wh.slope = TRUE, prior.wh.slope.shape = 3, prior.wh.slope.mean = 1,
          est.wh.exponent = TRUE, prior.wh.exponent.shape = 1, prior.wh.exponent.mean = 1,
          est.wh.level = TRUE, prior.wh.level.shape = 1, prior.wh.level.mean = 0.1,
-         est.wh.history = TRUE, prior.wh.history.shape = 1, prior.wh.history.mean = 100,
-         est.dist.exponent = TRUE, prior.dist.exponent.shape = 1, prior.dist.exponent.mean = 1,
-         est.dist.scale = TRUE, prior.dist.scale.shape = 1, prior.dist.scale.mean = 1,
-         est.dist.mean = TRUE, prior.dist.mean.shape = 1, prior.dist.mean.mean = 1,
-         use.tree = FALSE, use.NJtree = TRUE, ...) {
+         use.tree = FALSE, ...) {
   ########################################################
   ### parameter name compatibility with older versions ###
   ########################################################
@@ -143,57 +135,36 @@ phybreak <- function(dataset, times = NULL,
   if(exists("oldarguments$prior.wh.shape")) prior.wh.slope.shape <- oldarguments$prior.wh.shape
   if(exists("oldarguments$prior.wh.mean")) prior.wh.slope.mean <- oldarguments$prior.wh.mean
   
+  ### outbreak parameters ###
+  
+  le <- environment()
   
   ###########################################
   ### check for correct classes and sizes ###
   ###########################################
   dataset <- testdataclass_phybreak(dataset, times, ...)
-  rownames(as.character(dataset$sequences))
-  if(use.tree) {
-    introductions <- testfortree_phybreak(dataset, introductions)
-    use.NJtree <- FALSE
-  }
-  if(introductions > 1 | use.NJtree) multiple.introductions <- TRUE
-  if(!multiple.introductions) {
-    intro.rate <- 1
-    est.intro.rate <- FALSE
-  }
+  
+  if(use.tree) testfortree_phybreak(dataset)
+  # if(introductions > 1 | use.NJtree) multiple.introductions <- TRUE
+  # if(!multiple.introductions) {
+  #   intro.rate <- 1
+  #   est.intro.rate <- FALSE
+  # }
   testargumentsclass_phybreak(environment())
   wh.model <- choose_whmodel(wh.model)
   wh.bottleneck <- choose_whbottleneck(wh.bottleneck, wh.model)
-  dist.model <- choose_distmodel(dist.model, dataset$distances)
-  trans.model <- choose_transmodel(trans.model)
-  
-  ####################################
-  ### Load user-defined infectivity ###
-  ####################################
-  if(trans.model == "user-defined") {
-    if(is.null(infectivity_file))
-      stop("Please provide a R file stating the infectivity function")
-    else 
-      source(infectivity_file, local = userenv)
-  } else {
-    datas <- NULL
-    parameters <- NULL
-    helpers <- NULL
-    samplers <- NULL
-  }
-  
-  ### outbreak parameters ###
   
   ########################
   ### first slot: data ###
   ########################
   dataslot <- list()
   
-  #names, sequences, sample times, distances 
+  #names, sequences, sample times
   dataslot$names <- names(dataset$sample.times)
   dataslot$hostnames <- dataset$sample.hosts
   dataslot$sequences <- dataset$sequences
   dataslot$sample.times <- dataset$sample.times
-  dataslot$locations <- dataset$locations
-  dataslot$distances <- dataset$distances
-  
+
   #SNP count
   SNPpatterns <- do.call(rbind, dataslot$sequences)
   dataslot$nSNPs <- as.integer(
@@ -208,15 +179,9 @@ phybreak <- function(dataset, times = NULL,
   #Sample size
   dataslot$nsamples <- length(dataslot$names)
   
-  #Add data for user-defined function
-  dataslot <- c(dataslot, 
-                as.list(userenv)[setdiff(names(userenv), 
-                                         c("parameters", 
-                                           "helpers", 
-                                           "samplers", 
-                                           "infect_function"))])
+  #Reference date
   reference_date <- min(dataset$sample.times)
-  copy2userenv("reference_date", environment())
+  #copy2userenv("reference_date", environment())
   
   ##############################
   ### third slot: parameters ###
@@ -228,27 +193,76 @@ phybreak <- function(dataset, times = NULL,
     gen.mean = gen.mean,
     sample.shape = sample.shape,
     gen.shape = gen.shape,
-    trans.model = trans.model,
-    intro.rate = intro.rate,
     wh.model = wh.model,
     wh.bottleneck = wh.bottleneck,
     wh.slope = wh.slope,
     wh.exponent = wh.exponent,
-    wh.level = wh.level * (wh.bottleneck == "wide"),
-    wh.history = wh.history,
-    dist.model = dist.model,
-    dist.exponent = dist.exponent,
-    dist.scale = dist.scale,
-    dist.mean = dist.mean,
-    mult.intro = multiple.introductions
+    wh.level = wh.level * (wh.bottleneck == "wide")
   )
-  parameterslot <- c(parameterslot, userenv$parameters)
   
+  #################################
+  ### fourth slot: helper input ###
+  #################################
+  helperslot <- list(si.mu = if(dataslot$nSNPs == 0) 0 else 2.38*sqrt(trigamma(dataslot$nSNPs)),
+                     si.wh = 2.38*sqrt(trigamma(dataslot$nsamples - 1)),
+                     dist = distmatrix_phybreak(subset(dataslot$sequences, subset = 1:parameterslot$obs)),
+                     est.mu = est.mu,
+                     est.mG = est.gen.mean,
+                     est.mS = est.sample.mean,
+                     est.wh.s = est.wh.slope && wh.model == "linear",
+                     est.wh.e = est.wh.exponent && wh.model == "exponential",
+                     est.wh.0 = est.wh.level && wh.bottleneck == "wide",
+                     mu.av = prior.mu.mean,
+                     mu.sd = prior.mu.sd,
+                     mG.av = prior.gen.mean.mean,
+                     mG.sd = prior.gen.mean.sd,
+                     mS.av = prior.sample.mean.mean,
+                     mS.sd = prior.sample.mean.sd,
+                     wh.s.sh = prior.wh.slope.shape,
+                     wh.s.av = prior.wh.slope.mean,
+                     wh.e.sh = prior.wh.exponent.shape,
+                     wh.e.av = prior.wh.exponent.mean,
+                     wh.0.sh = prior.wh.level.shape,
+                     wh.0.av = prior.wh.level.mean)
+  
+  ###########################
+  ### fifth slot: samples ###
+  ###########################
+  sampleslot <- list(
+    inftimes = c(),
+    infectors = c(),
+    nodetimes = c(),
+    nodehosts = c(),
+    nodeparents = c(),
+    mu = c(),
+    mG = c(),
+    mS = c(),
+    wh.s = c(),
+    wh.e = c(),
+    wh.0 = c(),
+    logLik = c(),
+    heat = c()
+  )
+  
+  ###############################
+  ### add modules information ###
+  ############################### 
+
+  add_modules_to_phybreak(le, ...)
+  
+  dataslot <- le$dataslot
+  if (!is.null(dataslot$removal.times)) dataset$removal.times <- dataslot$removal.times
+  
+  parameterslot <- le$parameterslot
+  helperslot <- le$helperslot
+  sampleslot <- le$sampleslot
+
   ##############################
   ### second slot: variables ###
   ##############################
   phybreakvariables <- transphylo2phybreak(dataset, resample = !use.tree, resamplepars = parameterslot,
-                                           introductions = introductions, NJtree = use.NJtree)
+                                           introductions = ifelse(is.null(parameterslot$introductions), 1, parameterslot$introductions), 
+                                           NJtree = ifelse(is.null(parameterslot$use.NJtree), FALSE, parameterslot$use.NJtree))
   variableslot <- phybreakvariables$v
   dataslot$reference.date <- phybreakvariables$d$reference.date
   dataslot$names <- phybreakvariables$d$names
@@ -264,80 +278,6 @@ phybreak <- function(dataset, times = NULL,
   } else {
     parameterslot$mu <- mu
   }
-  
-  #################################
-  ### fourth slot: helper input ###
-  #################################
-  helperslot <- list(si.mu = if(dataslot$nSNPs == 0) 0 else 2.38*sqrt(trigamma(dataslot$nSNPs)),
-                     si.ir = 2.38*sqrt(trigamma(introductions)),
-                     si.wh = 2.38*sqrt(trigamma(dataslot$nsamples - 1)),
-                     si.dist = 2.38*sqrt(trigamma(parameterslot$obs - 1)),
-                     dist = distmatrix_phybreak(subset(dataslot$sequences, subset = 1:parameterslot$obs)),
-                     est.mu = est.mu,
-                     est.mG = est.gen.mean,
-                     est.mS = est.sample.mean,
-                     est.ir = est.intro.rate,
-                     est.wh.s = est.wh.slope && wh.model == "linear",
-                     est.wh.e = est.wh.exponent && wh.model == "exponential",
-                     est.wh.0 = est.wh.level && wh.bottleneck == "wide",
-                     est.wh.h = est.wh.history && multiple.introductions,
-                     est.dist.e = est.dist.exponent && dist.model %in% c("power", "exponential"),
-                     est.dist.s = est.dist.scale && dist.model == "power",
-                     est.dist.m = est.dist.mean && dist.model == "poisson",
-                     mu.av = prior.mu.mean,
-                     mu.sd = prior.mu.sd,
-                     mG.av = prior.gen.mean.mean,
-                     mG.sd = prior.gen.mean.sd,
-                     mS.av = prior.sample.mean.mean,
-                     mS.sd = prior.sample.mean.sd,
-                     ir.av = prior.intro.rate.mean,
-                     ir.sh = prior.intro.rate.shape,
-                     wh.s.sh = prior.wh.slope.shape,
-                     wh.s.av = prior.wh.slope.mean,
-                     wh.e.sh = prior.wh.exponent.shape,
-                     wh.e.av = prior.wh.exponent.mean,
-                     wh.0.sh = prior.wh.level.shape,
-                     wh.0.av = prior.wh.level.mean,
-                     wh.h.sh = prior.wh.history.shape,
-                     wh.h.av = prior.wh.history.mean,
-                     dist.e.sh = prior.dist.exponent.shape,
-                     dist.e.av = prior.dist.exponent.mean,
-                     dist.s.sh = prior.dist.scale.shape,
-                     dist.s.av = prior.dist.scale.mean,
-                     dist.m.sh = prior.dist.mean.shape,
-                     dist.m.av = prior.dist.mean.mean,
-                     inf.file = infectivity_file)
-  
-  helperslot <- c(helperslot, userenv$helpers)
-  
-  ###########################
-  ### fifth slot: samples ###
-  ###########################
-  sampleslot <- list(
-    inftimes = c(),
-    infectors = c(),
-    nodetimes = c(),
-    nodehosts = c(),
-    nodeparents = c(),
-    introductions = c(),
-    mu = c(),
-    mG = c(),
-    mS = c(),
-    ir = c(),
-    wh.s = c(),
-    wh.e = c(),
-    wh.0 = c(),
-    wh.h = c(),
-    dist.e = c(),
-    dist.s = c(),
-    dist.m = c(),
-    logLik = c(),
-    heat = c()
-  )
-  
-  sampleslot <- c(sampleslot, userenv$samplers)
-  
-  
 
   ################################
   ### make the phybreak object ###
@@ -370,7 +310,7 @@ testdataclass_phybreak <- function(dataset, times, ...) {
 }
 
 ### Test for presence of tree
-testfortree_phybreak <- function(dataset, introductions) {
+testfortree_phybreak <- function(dataset, introductions = 1) {
   if(is.null(dataset$sim.infection.times) | is.null(dataset$sim.infectors)) {
     warning("transmission tree can only be used if provided in dataset; random tree will be generated")
   } else {
@@ -395,7 +335,6 @@ testargumentsclass_phybreak <- function(env) {
       unlist(
         lapply(
           list(mutest, gen.shape, gen.mean, sample.shape, sample.mean,
-               introductions, intro.rate,
                wh.slope, wh.exponent, wh.level, prior.gen.mean.mean, prior.gen.mean.sd,
                prior.sample.mean.mean, prior.sample.mean.sd,
                prior.wh.slope.shape, prior.wh.slope.mean,
@@ -407,7 +346,6 @@ testargumentsclass_phybreak <- function(env) {
     if(any(numFALSE)) {
       stop(paste0("parameters ",
                   c("mu", "gen.shape", "gen.mean", "sample.shape", "sample.mean",
-                    "introductions", "intro.rate",
                     "wh.slope", "wh.exponent", "wh.level", "prior.gen.mean.mean", "prior.gen.mean.sd",
                     "prior.shape.mean.mean", "prior.shape.mean.sd",
                     "prior.wh.slope.shape", "prior.wh.slope.mean",
@@ -417,7 +355,6 @@ testargumentsclass_phybreak <- function(env) {
     }
     numNEGATIVE <- 
       c(mutest, gen.shape, gen.mean, sample.shape, sample.mean,
-        introductions, intro.rate,
         wh.slope, wh.exponent, wh.level, prior.gen.mean.mean, prior.gen.mean.sd,
         prior.sample.mean.mean, prior.sample.mean.sd,
         prior.wh.slope.shape, prior.wh.slope.mean,
@@ -427,7 +364,6 @@ testargumentsclass_phybreak <- function(env) {
     if(any(numNEGATIVE)) {
       stop(paste0("parameters ",
                   c("mu", "gen.shape", "gen.mean", "sample.shape", "sample.mean",
-                    "introductions", "intro.rate",
                     "wh.slope", "wh.exponent", "wh.level", "prior.gen.mean.mean", "prior.gen.mean.sd",
                     "prior.shape.mean.mean", "prior.shape.mean.sd",
                     "prior.wh.slope.shape", "prior.wh.slope.mean",
@@ -438,14 +374,14 @@ testargumentsclass_phybreak <- function(env) {
     logFALSE <- 
       unlist(
         lapply(
-          list(multiple.introductions, est.gen.mean, est.sample.mean,
+          list(est.gen.mean, est.sample.mean,
                est.wh.slope, est.wh.exponent, est.wh.level, use.tree),
           class
         )
       ) != "logical"
     if(any(logFALSE)) {
       stop(paste0("parameters ",
-                  c("multiple.introductions", "est.gen.mean", "est.sample.mean", "est.wh.slope", "est.wh.exponent", 
+                  c("est.gen.mean", "est.sample.mean", "est.wh.slope", "est.wh.exponent", 
                     "est.wh.level", "use.tree")[logFALSE],
                   " should be logical"))
     }

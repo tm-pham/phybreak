@@ -34,7 +34,7 @@
 #' infectorsets(MCMCstate)
 #' @export
 infectorsets <- function(x, which.hosts = "all", percentile = 0.95, minsupport = 0, samplesize = Inf, infector.name = TRUE, 
-    support = c("proportion", "count"), output = c("list", "matrix")) {
+    support = c("proportion", "count"), output = c("list", "matrix", "plot")) {
   if (!inherits(x, "phybreak")) 
     stop("object should be of class \"phybreak\"")
   
@@ -101,12 +101,17 @@ infectorsets <- function(x, which.hosts = "all", percentile = 0.95, minsupport =
     
     # array with ordered infectors per host, plus support
     
-    if(output == "matrix") {
+    if(output == "matrix" | output == "plot") {
       supportmatrix <- apply(1 + infectors[, samplerange], 
                              1, tabulate, nbin = 1 + obs)
       colnames(supportmatrix) <- hostnames
       rownames(supportmatrix) <- c("index", hostnames)
-      return(supportmatrix[, which.hosts]/denominator)
+      
+      if(output == "matrix"){
+        return(supportmatrix[, which.hosts]/denominator)
+      } else {
+        return(heatmap(supportmatrix, Colv = NA, Rowv = NA, scale = "column"))
+      }
     }
     
     inffreqs <- .infarray(infectors[, samplerange])

@@ -66,10 +66,12 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
                       arrow.lwd = 1, arrow.length = NULL, arrow.col = NULL, sample.pch = 4,
                       sample.lwd = NULL, sample.cex = label.cex, polygon.col = "gray", 
                       polygon.border = NA, line.lty = 3, xlab = "Time", 
-                      axis.cex = 1, title.cex = 1, ...) {
+                      axis.cex = 1, title.cex = 1, add.pch = 2, ...) {
   if(!inherits(x, c("phybreak", "phybreakdata"))) {
     stop("object x must be of class \"phybreak\" or \"phybreakdata\"")
   }
+  
+  trans.model <- ifelse(is.null(x$p$trans.model), "gamma", x$p$trans.model)
   
   if(inherits(x, "phybreakdata")) {
     if(exists("sim.infection.times", x) && exists("sim.infectors", x)) {
@@ -101,11 +103,18 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
     if (plot.which != "sample") {
       tree2plot <- suppressWarnings(transtree(x, plot.which, 
                                               infection.times = "infector", time.quantiles = 0.5))
+      
+      if (plot.which == "mpc") {
+        besttree <- transtree(x, "mpc", show.besttree = T)
+        tree2plot$inf.times.Q50 = x$s$inftimes[,besttree]
+      }
       # tree2plot$infector[tree2plot$infector=="history"] <- "index"
       # tree2plot <- tree2plot[-1,]
       
       vars <- list(sample.times = x$d$sample.times,
                    sample.hosts = x$d$hostnames,
+                   culling.times = x$d$removal.times,
+                   admin.times = x$d$admission.times,
                    sim.infection.times = tree2plot[, 3],
                    sim.infectors = as.character(tree2plot[, 1]),
                    post.support = tree2plot[, 2])
@@ -118,17 +127,14 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       }
       tg.mean <- median(x$s$mG)
       tg.shape = x$p$gen.shape
-      ttrans <- list(trans.model = x$p$trans.model,
+      ttrans <- list(trans.model = trans.model,
                      trans.sample = median(x$s$tS),
                      trans.init = x$p$trans.init,
                      trans.culling = x$p$trans.culling,
                      trans.growth = median(x$s$tG))
     } else if (samplenr == 0) {
-      # plot.which == "sample"
-      # if(x$p$obs != length(x$v$inftimes))
-      #   x$v <- remove_history(x)
       vars <- phybreak2trans(x$v, x$d$hostnames, x$d$reference.date,
-                             x$d$culling.times)
+                             x$d$removal.times)
       if(is.null(arrow.col)) {
         arrow.col <- "black"
       } else {
@@ -139,7 +145,7 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       tg.shape <- x$p$gen.shape
       trans.sample = x$p$trans.sample
       trans.growth = x$p$trans.growth
-      ttrans <- list(trans.model = x$p$trans.model,
+      ttrans <- list(trans.model = trans.model,
                      trans.sample = trans.sample,
                      trans.init = x$p$trans.init,
                      trans.culling = x$p$trans.culling,
@@ -159,7 +165,7 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       # vars <- remove_history(x)
       
       vars <- phybreak2trans(vars, unique(x$d$hostnames), x$d$reference.date,
-                             x$d$culling.times)
+                             x$d$removal.times)
       if(is.null(arrow.col)) {
         arrow.col <- "black"
       } else {
@@ -167,20 +173,21 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       }
       tg.mean <- x$s$mG[samplenr]
       tg.shape = x$p$gen.shape
-      ttrans <- list(trans.model = x$p$trans.model,
+      ttrans <- list(trans.model = trans.model,
                      trans.sample = x$s$tS[samplenr],
                      trans.init = x$p$trans.init,
                      trans.culling = x$p$trans.culling,
                      trans.growth = x$s$tG[samplenr])
     }
   }
+  
   maketransplot(vars, tg.mean = tg.mean, tg.shape = tg.shape, ttrans = ttrans,
                 mar = mar, label.cex = label.cex, 
                 label.space = label.space, label.adj = label.adj,
                 arrow.lwd = arrow.lwd, arrow.length = arrow.length, arrow.col = arrow.col, 
                 sample.pch = sample.pch, sample.lwd = sample.lwd, sample.cex = sample.cex, 
                 polygon.col = polygon.col, polygon.border = polygon.border, line.lty = line.lty,
-                xlab = xlab, axis.cex = axis.cex, title.cex = title.cex, ...)
+                xlab = xlab, axis.cex = axis.cex, title.cex = title.cex, add.pch = add.pch, ...)
 }
 
 maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0.1 + c(4, 0, 0, 0), label.cex = NULL, 
@@ -188,7 +195,7 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
                           arrow.lwd = 1, arrow.length = NULL, arrow.col = par("fg"), sample.pch = 4,
                           sample.lwd = NULL, sample.cex = label.cex, culling.pch = 7, polygon.col = "gray", 
                           polygon.border = NA, line.lty = 3, xlab = "Time", 
-                          axis.cex = 1, title.cex = 1, ...) {
+                          axis.cex = 1, title.cex = 1, add.pch = 2, ...) {
   oldmar <- par("mar")
   par(mar = mar)
   on.exit(par(mar = oldmar))
@@ -215,7 +222,8 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
   timedorder <- order(head(ordertimes, -1))
   inftimes <- x$sim.infection.times[timedorder]
   samtimes <- x$sample.times[timedorder]
-  cultimes <- userenv$culling.times[timedorder]
+  cultimes <- x$culling.times[timedorder]
+  adtimes <- x$admin.times[timedorder]
   infectors <- x$sim.infectors[timedorder]
   arrow.colours <- arrow.colours[timedorder]
   hosts <- names(inftimes)
@@ -229,13 +237,14 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
   infectorpos[is.na(infectorpos)] <- 0
   
   ### calculate parameters needed for plotting
-  tmin <- min(inftimes)
-  tmax <- max(samtimes)
+  tmin <- if (is.null(adtimes))  min(inftimes) else min(adtimes, inftimes)
+  tmax <- if (is.null(cultimes)) max(samtimes) else max(cultimes)
   tstep <- as.numeric(tmax-tmin)/2000
   tgmean <- if(is.na(tg.mean)) as.numeric(mean(inftimes - inftimes[infectors], na.rm = T)) else tg.mean
   tgvar <- if(is.na(tg.shape)) as.numeric(var(inftimes - inftimes[infectors], na.rm = T)) else NA
   tgscale <- if(is.na(tg.shape)) tgvar/tgmean else tgmean/tg.shape
   tgshape <- if(is.na(tg.shape)) tgmean/tgscale else tg.shape
+  
   if(length(ttrans)==0 || ttrans$trans.model == "gamma") {
     p <- list(gen.mean = tgmean,
               gen.shape = tgshape,
@@ -289,15 +298,24 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
   for(i in 1:obs) {
     x0s <- seq(inftimes[i], tmax - tstep, tstep)
     #widths <- abs(1 - (maxwd - dgamma(x0s - inftimes[i], shape = tgshape, scale = tgscale)) / maxwd)
-    #print(cultimes[i])
-    if(p$trans.model == "user-defined"){
+    if(p$trans.model == "user"){
       widths <- sapply(x0s, function(x){
-        ifelse(x <= cultimes[i], 1, 0)
+        ifelse(x <= cultimes[i], infect_distribution(x, inftimes[i],
+                                                     le = list(p = p, v = list(nodetimes = samtimes)),
+                                                     nodetimes = samtimes), 0)
       })
-
+      widths <- abs(1 - (maxwd - widths)/maxwd)
+    } else if (!is.null(cultimes)) {
+      widths <- sapply(x0s, function(x){
+        #if (x0s < adtimes[i]) return(0)
+        if (x <= cultimes[i]) return(infect_distribution(x, inftimes[i],
+                                                     le = list(p = p, v = list(nodetimes = samtimes)),
+                                                     nodetimes = samtimes))
+        else return(0)
+      })
       widths <- abs(1 - (maxwd - widths)/maxwd)
     } else {
-    widths <- abs(1 - (maxwd - infect_distribution(x0s, inftimes[i], 
+      widths <- abs(1 - (maxwd - infect_distribution(x0s, inftimes[i], 
                                                    le = list(p = p, v = list(nodetimes = samtimes)),
                                                    nodetimes = samtimes)) / maxwd)
     }
@@ -312,19 +330,18 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
             )
   }
   do.call(text,
-          c(list(x = max(samtimes) + 10 * tstep,
+          c(list(x = tmax + 10 * tstep,
                  y = plotrank,
                  labels = hosts, 
                  adj = label.adj, 
                  cex = label.cex),
             graphicalparameters("label", timedorder, ...)))
   
-  
   ### Horizontal lines
   do.call(segments,
-          c(list(x0 = inftimes,
+          c(list(x0 = if(is.null(adtimes)) inftimes else pmin(adtimes, inftimes),
                  y0 = plotrank,
-                 x1 = max(samtimes),
+                 x1 = tmax,
                  lty = line.lty),
             graphicalparameters("line", 1, ...)
             )
@@ -365,16 +382,27 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
             )
           )
   
-  ### Culling
-  # do.call(points,
-  #         c(list(x = cultimes, 
-  #                y = plotrank[match(names(cultimes), hosts)],
-  #                pch = culling.pch, 
-  #                lwd = sample.lwd, 
-  #                cex = sample.cex),
-  #           graphicalparameters("sample", 1, ...)
-  #         )
-  # )
+  ### Admission times
+  if(!is.null(adtimes))
+    do.call(points,
+            c(list(x = adtimes, 
+                   y = plotrank,
+                   pch = 2, 
+                   lwd = sample.lwd, 
+                   cex = sample.cex),
+              graphicalparameters("sample", 1, ...)
+            ))
+  
+  ### Removal times
+  if(!is.null(cultimes))
+    do.call(points,
+          c(list(x = cultimes, 
+                 y = plotrank,
+                 pch = 6, 
+                 lwd = sample.lwd, 
+                 cex = sample.cex),
+            graphicalparameters("sample", 1, ...)
+          ))
 }
 
 rankhostsforplot <- function(hosts, infectors) {

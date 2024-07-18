@@ -19,22 +19,31 @@ infect_distribution <- function(time, inftimes, le,
                                 host = NULL, log = FALSE){
   
   ### Gamma distributed ####
-  if(le$p$trans.model == "gamma") {
-    if(log)
-      return(dgamma(time - inftimes, 
-                    shape = le$p$gen.shape, 
-                    scale = le$p$gen.mean/le$p$gen.shape,
-                    log = TRUE))
-    else 
-      return(dgamma(time - inftimes, 
-                    shape = le$p$gen.shape, 
-                    scale = le$p$gen.mean/le$p$gen.shape,
-                    log = FALSE))
+  trans.model <- ifelse(is.null(le$p$trans.model), "gamma", le$p$trans.model)
+  
+  if(trans.model == "gamma") {
+    if(is.null(le$d$removal.times)){
+    
+      if(log)
+        return(dgamma(time - inftimes, 
+                      shape = le$p$gen.shape, 
+                      scale = le$p$gen.mean/le$p$gen.shape,
+                      log = TRUE))
+      else 
+        return(dgamma(time - inftimes, 
+                      shape = le$p$gen.shape, 
+                      scale = le$p$gen.mean/le$p$gen.shape,
+                      log = FALSE))
+    } else {
+      return(le$p$inf_function(time, inftimes, le,
+                               nodetimes, host, log))
+    }
+    
 
   ### User-defined generation distribution ###
-  } else if(le$p$trans.model =="user-defined") {
-    
-    return(userenv$infect_function(time, inftimes, le, 
+  } else if(trans.model =="user") {
+    #print(list(time, inftimes, le, nodetimes, host, log))
+    return(le$p$inf_function(time, inftimes, le, 
                            nodetimes, host, log))
   }
 }

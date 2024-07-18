@@ -46,6 +46,7 @@ build_pbe <- function(phybreak.obj) {
   h <- phybreak.obj$h
   v <- phybreak.obj$v
   p <- phybreak.obj$p
+  lik_func <- phybreak.obj$likelihoods
   SNP <- t(matrix(unlist(d$sequences), ncol = d$nsamples))
   SNPfr <- attr(d$sequences, "weight")
   
@@ -71,7 +72,10 @@ build_pbe <- function(phybreak.obj) {
   snpfrreduced <- SNPfr
   # remove identical SNP patterns
   if (ncol(SNP) > 1) {
+    # create progress bar
+    #pb <- txtProgressBar(min = 0, max = (ncol(SNP)-1), style = 3)
     for (i in (ncol(SNP) - 1):1) {
+    #  setTxtProgressBar(pb, i)
       for (j in length(snpfrreduced):(i + 1)) {
         if (all(snpreduced[, i] == snpreduced[, j])) {
           snpfrreduced[i] <- snpfrreduced[i] + snpfrreduced[j]
@@ -80,6 +84,7 @@ build_pbe <- function(phybreak.obj) {
         }
       }
     }
+  #  close(pb)
   }
   likarrayfreq <- snpfrreduced
   
@@ -96,32 +101,62 @@ build_pbe <- function(phybreak.obj) {
   likarray[cbind(4, rep(1:length(snpfrreduced), each = d$nsamples), rep(1:d$nsamples, 
                                                                         length(snpfrreduced)))] <- 1 * (snpreduced %in% c(4, 5, 8, 10, 11, 13, 14, 15, 16))
   
-  
-  
   ### change the variables slot to an environmental variables slot (with transmission nodes in the tree)
   v <- phybreak2environment(v)
   
   ### complete likarray and calculate log-likelihood of sequences
   .likseqenv(le, (d$nsamples + 1):(2 * d$nsamples - 1), 1:d$nsamples)
   
+  ### initialize all dimensions of contactarray
+  if (inherits(d$contact, "matrix")){
+    contactarray <- array(1, dim = c(ncol(d$contact), nrow(d$contact), 1))
+  } else {
+    contactarray <- array(1, dim = c(length(unique(d$hostnames)), 
+                                   length(unique(d$hostnames)),
+                                   length(d$contact)))
+  }
+
+  if (p$contact){
+    ### initialize contact array with initial transmission tree
+    for (i in seq_len(dim(contactarray)[3])){
+      for(host_i in seq_len(ncol(contactarray[,,i]))){
+        for(host_j in seq_len(ncol(contactarray[,,i]))){
+          contactarray[host_i,host_j,i] <- phybreak:::get_contact_probability(contactarray[,,i], host_i, host_j, le)
+        }
+      }
+    }
+  }
+  copy2pbe0("contactarray", le)
+
+
   ### calculate the other log-likelihoods
   logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes)
   logLikgen <- lik_gentimes(le)
   logLikcoal <- lik_coaltimes(le)
-  logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean, 
-                              v$infectors, d$distances)
+
+  if(length(lik_func) > 0){
+    for(n in names(lik_func)){
+      assign(n, lik_func[[n]](le))
+      copy2pbe0(n, le)
+    }
+  }
+  
+  # logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean, 
+  #                             v$infectors, d$distances, d$area)
+  # logLikcontact <- lik_contact(v$infectors, d$contact.matrix, p$cnt.invest.trans, p$cnt.invest.nontrans,
+  #                              p$cnt.rep, p$cnt.rep.false)
   
   ### copy everything into pbe0
   copy2pbe0("d", le)
   copy2pbe0("h", le)
   copy2pbe0("v", le)
   copy2pbe0("p", le)
+  copy2pbe0("lik_func", le)
   copy2pbe0("likarrayfreq", le)
   copy2pbe0("likarray", le)
   copy2pbe0("logLikseq", le)
   copy2pbe0("logLiksam", le)
   copy2pbe0("logLikgen", le)
-  copy2pbe0("logLikdist", le)
   copy2pbe0("logLikcoal", le)
 }
 
@@ -147,6 +182,7 @@ prepare_pbe <- function() {
   copy2pbe1("h", pbe0)
   pbe1$likarray <- pbe0$likarray + 0  #make a true copy, not a pointer
   copy2pbe1("likarrayfreq", pbe0)
+  pbe1$contactarray <- pbe0$contactarray + 0 # make a true copy, not a pointer
   pbe1$logLikseq <- pbe0$logLikseq + 0 #make a true copy, not a pointer
   pbe1$logLiktoporatio <- 0
 }
@@ -161,6 +197,8 @@ propose_pbe <- function(f) {
   v <- pbe1$v
   p <- pbe1$p
   h <- pbe0$h
+  contactarray <- pbe0$contactarray
+  lik_func <- pbe0$lik_func
   hostID <- pbe1$hostID
   
   if (f == "phylotrans" || f == "withinhost") {
@@ -182,14 +220,32 @@ propose_pbe <- function(f) {
   } else {
     chnodes <- NULL
   }
-  
-  
-  
+    
   if (!is.null(chnodes)) {
     .likseqenv(pbe1, chnodes, nodetips)
+
+    if (p$contact == TRUE){
+      chhosts <- which(v$infectors != pbe0$v$infectors)
+      if (length(chhosts) > 0){
+        if (length(chhosts) > 1){
+          host.pairs <- combn(chhosts[chhosts <= ncol(d$contact)], m=2)
+        } else if (length(chhosts) == 1){
+          host.pairs <- t(t(c(v$infectors[chhosts], chhosts)))
+        }
+        if (!(0 %in% host.pairs)){
+          for (i in seq_len(ncol(host.pairs))){
+            for (array_i in seq_len(dim(contactarray)[3])){
+              contactarray[host.pairs[1,i],host.pairs[2,i],array_i] <- 
+              get_contact_probability(contactarray[,,array_i], host.pairs[1,i], host.pairs[2,i], le)
+            }
+          }
+        }
+      }
+      copy2pbe1("contactarray", le)
+    }
   }
   
-  if (f == "phylotrans" || f == "trans" || f == "mG" || f == "ir") {
+  if (f == "phylotrans" || f == "trans" || f == "mG" || f == "ir" || f == "R") {
     logLikgen <- lik_gentimes(le)
     copy2pbe1("logLikgen", le)
   }
@@ -204,11 +260,36 @@ propose_pbe <- function(f) {
     copy2pbe1("logLikcoal", le)
   }
   
-  if (f == "trans" || f == "phylotrans" || f == "dist.exponent" || f == "dist.scale" || f == "dist.mean") {
-    logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean,
-                                v$infectors[v$infectors!=0]-1, d$distances)
-    copy2pbe1("logLikdist", le)
+  if (f == "contact"){
+    for (array_i in seq_len(dim(contactarray)[3])){
+      for(host_i in seq_len(dim(contactarray)[1])){
+        for(host_j in seq_len(dim(contactarray)[2])){
+          if (dim(contactarray)[3] == 1) contactarray[host_i,host_j,array_i] <- get_contact_probability(d$contact, host_i, host_j, le)
+          else contactarray[host_i,host_j,array_i] <- get_contact_probability(d$contact[[array_i]], host_i, host_j, le)
+        }
+      }
+    }
+    copy2pbe1("contactarray", le)
   }
+
+  logLiks <- names(pbe0)[grepl("logLik", names(pbe0))]
+  if (length(setdiff(logLiks, c("logLikseq", "logLikcoal", "logLiksam", "logLikgen"))) > 0){
+    for(n in names(lik_func)){
+      assign(n, lik_func[[n]](le))
+      copy2pbe1(n, le)
+    }
+  }
+  
+  # if (f == "trans" || f == "phylotrans" || f == "dist.exponent" || f == "dist.scale" || f == "dist.mean") {
+  #   logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean,
+  #                               v$infectors, d$distances, d$area)
+  #   copy2pbe1("logLikdist", le)
+  # }
+  # 
+  # if (f == ){}
+  #   logLikcontact <- lik_contact(p)
+  #   copy2pbe1("logLikcontact")
+  # }
   
   # if (f == "phylotrans" || f == "hist.mean"){
   #   logLikintro <- lik_introductions(p$hist.mean, sum(v$infectors == 1), 
@@ -247,9 +328,9 @@ accept_pbe <- function(f) {
     copy2pbe0("logLikgen", pbe1)
   }
   
-  if (f == "trans" || f == "phylotrans" || f == "dist.exponent" || f == "dist.scale" || f == "dist.mean") {
-    copy2pbe0("logLikdist", pbe1)
-  }
+  # if (f == "trans" || f == "phylotrans" || f == "dist.exponent" || f == "dist.scale" || f == "dist.mean") {
+  #   copy2pbe0("logLikdist", pbe1)
+  # }
   
   if(f == "trans" || (f == "mS" && pbe0$p$wh.bottleneck == "wide") || f == "wh.slope" || f == "wh.exponent" || f == "wh.level" || f == "wh.history") {
     copy2pbe0("logLikcoal", pbe1)
@@ -260,5 +341,46 @@ accept_pbe <- function(f) {
     copy2pbe0("logLikcoal", environment())
   }
   
+  logLiks <- names(pbe0)[grepl("logLik", names(pbe0))]
+  if (length(setdiff(logLiks, c("logLikseq", "logLikcoal", "logLiksam", "logLikgen"))) > 0){
+    logLiks <- setdiff(logLiks, c("logLikseq", "logLikcoal", "logLiksam", "logLikgen"))
+    for(n in logLiks){
+      copy2pbe0(n, pbe1)
+      if (n == "logLikcontact"){
+        copy2pbe0("contactarray", pbe1)
+        copy2pbe0("p", pbe1)
+      }
+    }
+  }
+  
 }
 
+get_contact_probability <- function(contact, host_i, host_j, le){
+  v = le$v
+  p = le$p
+  if (host_i != host_j){
+    #tau <- ifelse(dim(contactarray)[3] == 1, 1, floor(v$inftimes[host_j]))
+    if (v$infectors[host_j] == host_i || v$infectors[host_i] == host_j){
+      if (contact[host_i,host_j] == 1){
+        return((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon)
+      } else{
+        return((1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon))
+      }
+    # } else if (v$infectors[host_i] == host_j){
+    #   tau <- ifelse(dim(contactarray)[3] == 1, 1, floor(v$inftimes[host_j]))
+    #   if (d$contact[[tau]][j,i] == 1){
+    #     lik <- c(lik, ((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon) * contact.probs[categories[i], categories[j]])
+    #   } else{
+    #     lik <- c(lik, (1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon) * (1-contact.probs[categories[i], categories[j]]))
+    #   }
+    } else {
+      if (contact[host_i,host_j] == 1){
+        return((1-p$cnt.lambda)*p$cnt.zeta + p$cnt.lambda * p$cnt.epsilon)
+      } else {
+        return((1-p$cnt.lambda)*(1-p$cnt.zeta) + p$cnt.lambda * (1-p$cnt.epsilon))
+      }
+    }
+  } else {
+    return(1)
+  }
+}

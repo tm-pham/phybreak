@@ -45,8 +45,8 @@
 #'                           dimnames = list(LETTERS[1:5], NULL))
 #' dataset <- phybreakdata(sequences = sampleSNPdata, sample.times = sampletimedata)
 #' @export
-phybreakdata <- function(sequences, sample.times, spatial = NULL, sample.names = NULL, host.names = sample.names, 
-                         culling.times = NULL, external.sequence = FALSE,
+phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL,
+                         culling.times = NULL, sample.names = NULL, host.names = sample.names, 
                          sim.infection.times = NULL, sim.infectors = NULL, sim.tree = NULL) {
   
   ##########################################################
@@ -114,18 +114,6 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, sample.names =
   } else {
     warning("names in host.names don't match sample.names and are therefore overwritten")
     names(host.names) <- sample.names
-  }
-  
-  if(is.null(external.sequence)){
-    seq.dist <- dist.dna(as.DNAbin(sequences))*ncol(sequences)
-    ext.seq <- generateSequence(sequences)
-    sequences <- rbind(sequences, ext.seq)
-    name <- sprintf("sample.%s.0", nrow(sequences))
-    sample.names <- c(sample.names, name)
-    sample.times <- c(sample.times, min(sample.times))
-    names(sample.times)[nrow(sequences)] <- name 
-    host.names <- c(host.names, name)
-    names(host.names)[nrow(sequences)] <- name
   }
   
   ##########################################################################
@@ -266,6 +254,31 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, sample.names =
     res <- c(res, list(culling.times = culling.times))
   }
   
+  ### Conctact data ###
+  
+  if(!is.null(contact)){
+    if(!inherits(contact, "matrix") || !is.numeric(contact))
+      stop("\"contact\" should be a numeric matrix")
+    if(nrow(contact) != ncol(contact))
+      stop("\"contact\" should be a square matrix of same size as number of hosts")
+    if(nrow(contact) != length(allhosts)) {
+      stop("size of \"contact\" does not correspond to number of hosts")
+    }
+    if(is.null(rownames(contact)) || is.null(colnames(contact))) {
+      warning("\"contact\" data do not contain names; names are assigned")
+      rownames(contact) <- allhosts
+      colnames(contact) <- allhosts
+    }
+    if (all(names(culling.times) %in% orderedhosts)) {
+      contact <- contact[match(rownames(contact), orderedhosts),match(rownames(contact), orderedhosts)]
+    } else {
+      warning("names in contact don't match host.names and are therefore overwritten")
+      contact <- contact[match(rownames(contact), orderedhosts),match(rownames(contact), orderedhosts)]
+      rownames(contact) <- colnames(contact) <- orderedhosts
+    }
+    res <- c(res, list(contact.matrix = contact))
+  }
+  
   ### infection times ###
   if(!is.null(sim.infection.times)) {
     if(class(sim.infection.times) != class(sample.times)) {
@@ -342,15 +355,15 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, sample.names =
   class(res) <- "phybreakdata"
   return(res)
 }
-
-generateSequence <- function(s){
-  dist.seq <- ceiling(max(dist.dna(as.DNAbin(s))*ncol(s))) + 1000
-  pos <- sample(ncol(s), dist.seq)
-  nucl <- sample(c("a", "c", "t", "g"), dist.seq, replace = T)
-  new_seq <- s[sample(nrow(s),1),]
-  new_seq[pos] <- nucl
-  return(new_seq)
-}
+# 
+# generateSequence <- function(s){
+#   dist.seq <- ceiling(max(dist.dna(as.DNAbin(s))*ncol(s))) + 1000
+#   pos <- sample(ncol(s), dist.seq)
+#   nucl <- sample(c("a", "c", "t", "g"), dist.seq, replace = T)
+#   new_seq <- s[sample(nrow(s),1),]
+#   new_seq[pos] <- nucl
+#   return(new_seq)
+# }
 
 
 

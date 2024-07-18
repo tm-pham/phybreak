@@ -36,7 +36,7 @@
 sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, keepphylo = 0, withinhost_only = 0, 
                             parameter_frequency = 1, status_interval = 10, 
                             verbose = 1, historydist = 0.5,
-                            nchains = 1, heats = NULL, all_chains = FALSE, parallel = FALSE, ...) {
+                            nchains = 1, heats = NULL, all_chains = FALSE, parallel = FALSE, shiny = FALSE, ...) {
   
   if (parallel)
     return(sample_phybreak_parallel(x, nsample, thin, thinswap, classic, keepphylo, withinhost_only, 
@@ -59,6 +59,10 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       warning("model incompatible with keepphylo-updates: they will not be used", immediate. = TRUE)
     } 
   }
+  
+  #le <- environment()
+  x <- add_modules_to_phybreak(x, phyb.obj = FALSE, ...)
+  
   if(!x$p$mult.intro & historydist > 0) {
     historydist <- 0
   }
@@ -82,18 +86,18 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
   }
   
   ### add distance model if not present
-  if(is.null(x$p$dist.model)) {
-    x$p$dist.model <- "none"
-    x$p$dist.exponent <- 2
-    x$p$dist.scale <- 1
-    x$p$dist.mean <- 1
-    x$s$dist.e <- c()
-    x$s$dist.s <- c()
-    x$s$dist.m <- c()
-    x$h$est.dist.s <- FALSE
-    x$h$est.dist.e <- FALSE
-    x$h$est.dist.m <- FALSE
-  }
+  # if(is.null(x$p$dist.model)) {
+  #   x$p$dist.model <- "none"
+  #   x$p$dist.exponent <- 2
+  #   x$p$dist.scale <- 1
+  #   x$p$dist.mean <- 1
+  #   x$s$dist.e <- c()
+  #   x$s$dist.s <- c()
+  #   x$s$dist.m <- c()
+  #   x$h$est.dist.s <- FALSE
+  #   x$h$est.dist.e <- FALSE
+  #   x$h$est.dist.m <- FALSE
+  # }
   
   protocoldistribution <- c(1 - classic - keepphylo - withinhost_only, classic, keepphylo, withinhost_only)
   historydistribution <- c(historydist, 1 - historydist)
@@ -108,29 +112,43 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
                  mu = c(x$s$mu, rep(NA, nsample)), 
                  mG = c(x$s$mG, rep(NA, nsample)), 
                  mS = c(x$s$mS, rep(NA, nsample)), 
-                 ir = c(x$s$ir, rep(NA, nsample)),
                  wh.s = c(x$s$wh.s, rep(NA, nsample)), 
                  wh.e = c(x$s$wh.e, rep(NA, nsample)), 
-                 wh.0 = c(x$s$wh.0, rep(NA, nsample)), 
-                 wh.h = c(x$s$wh.h, rep(NA, nsample)), 
-                 dist.e = c(x$s$dist.e, rep(NA, nsample)), 
-                 dist.s = c(x$s$dist.s, rep(NA, nsample)), 
-                 dist.m = c(x$s$dist.m, rep(NA, nsample)), 
+                 wh.0 = c(x$s$wh.0, rep(NA, nsample)),
                  logLik = c(x$s$logLik, rep(NA, nsample)),
                  heat = c(x$s$heat, rep(NA, nsample)))
   
-  if (!is.null(userenv$samplers)){
-    for (n in names(userenv$samplers)){
-      s.post <- c(s.post, list(c(x$s[[n]], rep(NA, nsample))))
-      names(s.post)[length(s.post)] <- n
+  ### create room for additional parameters from modules
+  s.post.modules <- lapply(setdiff(names(x$s), names(s.post)), function(n){
+    if(n == "cnt.types"){
+      with(x, cbind(s$cnt.types, matrix(NA, nrow = 2, ncol = nsample - 1)))
+    } else{
+      return(c(x$s[[n]], rep(NA, nsample)))
     }
-  }
-      
+  })
+  names(s.post.modules) <- setdiff(names(x$s), names(s.post))
+  s.post <- c(s.post, s.post.modules)
+    
+                 # ir = c(x$s$ir, rep(NA, nsample)),
+                 # wh.h = c(x$s$wh.h, rep(NA, nsample)), 
+                 # dist.e = c(x$s$dist.e, rep(NA, nsample)), 
+                 # dist.s = c(x$s$dist.s, rep(NA, nsample)), 
+                 # dist.m = c(x$s$dist.m, rep(NA, nsample)), 
+                 # R = c(x$s$R, rep(NA, nsample)))
+  
+  # if (!is.null(userenv$samplers)){
+  #   for (n in names(userenv$samplers)){
+  #     s.post <- c(s.post, list(c(x$s[[n]], rep(NA, nsample))))
+  #     names(s.post)[length(s.post)] <- n
+  #   }
+  # }
+  #     
   s.posts <- lapply(1:nchains, function(i) s.post)
     
   build_pbe(x)
   
   envirs <- list()
+  npars <- sum(grepl("est", names(x$h)))
   
   for (n in 1:nchains){
     heat <- heats[n]
@@ -146,15 +164,17 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
     print_screen_log(length(x$s$mu))
   
   curtime <- Sys.time()
-
+  
   swap_thin <- 0
   shared_heats <- heats
   
   for (sa in tail(1:length(s.posts[[1]]$mu), nsample)) {
-    #incProgress(1/length(tail(1:length(s.posts[[1]]$mu), nsample)))
+    #if(shiny == TRUE) incProgress(1/length(tail(1:length(s.posts[[1]]$mu), nsample)))
     for (rep in 1:thin) {
       if(Sys.time() - curtime > status_interval & printlog == TRUE) {
-        for (i in ls(envir=envirs[[1]])) copy2pbe0(i, envirs[[1]])
+        #saveRDS(s.posts, "~/Documents/phybreak/test.rds")
+        heats <- sapply(envirs, function(e) return(e[["heat"]]))
+        for (i in ls(envir=envirs[[which(heats == 1)]])) copy2pbe0(i, envirs[[which(heats == 1)]])
         print_screen_log(sa)
         curtime <- Sys.time()
       }
@@ -166,7 +186,7 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       envirs <- lapply (envirs, function(e) {
         for (i in ls(envir=e)) copy2pbe0(i, e)
         
-        for(i in  sample(c(rep(-(1:13), parameter_frequency), 0:x$p$obs))) {
+        for(i in  sample(c(rep(-(1:npars), parameter_frequency), 0:x$p$obs))) {
           if(i >= 0) {
             which_protocol <- sample(c("edgewise", "classic", "keepphylo", "withinhost"),
                                      1,
@@ -174,25 +194,28 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
             history <- sample(c(TRUE, FALSE), 1, prob = historydistribution)
             update_host(i, which_protocol, history || i == 0)
           }
-        
+          
           if (i == -1 && x$h$est.mu) update_mu()
           if (i == -2 && x$h$est.mG) update_mG()
           if (i == -3 && x$h$est.mS) update_mS()
           if (i == -4 && x$h$est.wh.s)  update_wh_slope()
           if (i == -5 && x$h$est.wh.e)  update_wh_exponent()
           if (i == -6 && x$h$est.wh.0)  update_wh_level()
-          if (i == -7 && x$h$est.wh.h) update_wh_history()
-          if (i == -8 && x$h$est.dist.e)  update_dist_exponent()
-          if (i == -9 && x$h$est.dist.s)  update_dist_scale()
-          if (i == -10 && x$h$est.dist.m)  update_dist_mean()
-          if (i == -11 && x$h$est.ir) update_ir()
-          if (i < -11){
-            if (!is.null(userenv$helpers)) {
-              if (userenv$helpers[[-11 - i]]) {
-                userenv$updaters[[-11 - i]]()
-              }
-            }
-          }
+          if (i < -6)  x$updaters[[-6 - i]]()
+          
+          # if (i == -7 && x$h$est.wh.h) update_wh_history()
+          # if (i == -8 && x$h$est.dist.e)  update_dist_exponent()
+          # if (i == -9 && x$h$est.dist.s)  update_dist_scale()
+          # if (i == -10 && x$h$est.dist.m)  update_dist_mean()
+          # if (i == -11 && x$h$est.ir) update_ir()
+          # if (i == -12 && x$h$est.R) update_R()
+          # if (i < -12){
+          #   if (!is.null(userenv$helpers)) {
+          #     if (userenv$helpers[[-12 - i]]) {
+          #       userenv$updaters[[-12 - i]]()
+          #     }
+          #   }
+          # }
           
         }
         
@@ -201,8 +224,9 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       
       if(nchains > 1 & swap_thin %% thinswap == 0){
         shared_lik <- do.call(cbind, lapply(envirs, function(xx){
-          sum(xx$logLikcoal, xx$logLikgen, xx$logLiksam, xx$logLikdist, 
-              xx$logLikseq)
+          sum(sapply(names(xx)[grepl("logLik", names(xx))], function(n) xx[[n]]))
+          # sum(xx$logLikcoal, xx$logLikgen, xx$logLiksam, xx$logLikdist, 
+          #     xx$logLikseq)
         }))
         
         shared_heats <- swap_heats(shared_heats, shared_lik)
@@ -224,27 +248,37 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
       s.post$nodeparents[, sa] <- vars_to_log$nodeparents
       s.post$introductions[sa] <- sum(vars_to_log$infectors == 0)
       s.post$mu[sa] <- pbe0$p$mu
-      s.post$hist_dens[sa] <- pbe0$h$dist[1]
-      s.post$hist.mean[sa] <- pbe0$p$hist.mean
+      #s.post$hist_dens[sa] <- pbe0$h$dist[1]
+      #s.post$hist.mean[sa] <- pbe0$p$hist.mean
       s.post$mG[sa] <- pbe0$p$gen.mean
       s.post$mS[sa] <- pbe0$p$sample.mean
-      s.post$ir[sa] <- pbe0$p$intro.rate
-      s.post$wh.h[sa] <- pbe0$p$wh.history
       s.post$wh.s[sa] <- pbe0$p$wh.slope
       s.post$wh.e[sa] <- pbe0$p$wh.exponent
       s.post$wh.0[sa] <- pbe0$p$wh.level
-      s.post$dist.e[sa] <- pbe0$p$dist.exponent
-      s.post$dist.s[sa] <- pbe0$p$dist.scale
-      s.post$dist.m[sa] <- pbe0$p$dist.mean
-      s.post$logLik[sa] <- sum(pbe0$logLikcoal, pbe0$logLikgen, pbe0$logLiksam, 
-                               pbe0$logLikdist, pbe0$logLikintro, pbe0$logLikseq) 
+      s.post$logLik[sa] <- sum(sapply(names(pbe0)[grepl("logLik", names(pbe0))], function(n) pbe0[[n]]))
       s.post$heat[sa] <- pbe0$heat
       
-      if (!is.null(userenv$samplers)){
-        for (i in 1:length(userenv$samplers)){
-          s.post[[names(userenv$samplers)[i]]][sa] <- tail(pbe0$p, length(userenv$samplers))[i][[1]] 
+      if(length(s.post) > 14){
+        for(n in setdiff(names(s.post)[15:length(names(s.post))], "chain")){
+          if (n == "cnt.types"){
+            s.post[[n]][,sa] <- pbe0$p[[n]]
+          } else {
+            s.post[[n]][sa]<- pbe0$p[[n]]
+          }
         }
       }
+      # s.post$ir[sa] <- pbe0$p$intro.rate
+      # s.post$wh.h[sa] <- pbe0$p$wh.history
+      # s.post$dist.e[sa] <- pbe0$p$dist.exponent
+      # s.post$dist.s[sa] <- pbe0$p$dist.scale
+      # s.post$dist.m[sa] <- pbe0$p$dist.mean
+      # s.post$R[sa] <- pbe0$p$R
+      
+      # if (!is.null(userenv$samplers)){
+      #   for (i in 1:length(userenv$samplers)){
+      #     s.post[[names(userenv$samplers)[i]]][sa] <- tail(pbe0$p, length(userenv$samplers))[i][[1]] 
+      #   }
+      # }
       s.posts[[chain]] <- s.post
       
     })
@@ -265,7 +299,9 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
     return(s)
   })
     
-  s.post <- s.posts[[1]]
+  s.post <- s.posts[[unlist(lapply(1:length(s.posts), function(i){
+    if (all(s.posts[[i]]$heat == 1)) return(i)
+  }))]]
   
   if(all_chains){
     chains <- lapply(s.posts, function(x){

@@ -51,7 +51,10 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
     } 
   }
   
-  if(!x$p$mult.intro & historydist > 0) {
+  ### add functions for modules
+  x <- add_modules_to_phybreak(x, phyb.obj = FALSE)
+  
+  if(is.null(x$p$mult.intro)) {
     historydist <- 0
   }
   if (is.null(heats))
@@ -62,29 +65,24 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
     stop("heats is not a numeric vector")
   
   ### add distance model if not present
-  if(is.null(x$p$dist.model)) {
-    x$p$dist.model <- "none"
-    x$p$dist.exponent <- 2
-    x$p$dist.scale <- 1
-    x$p$dist.mean <- 1
-    x$s$dist.e <- c()
-    x$s$dist.s <- c()
-    x$s$dist.m <- c()
-    x$h$est.dist.s <- FALSE
-    x$h$est.dist.e <- FALSE
-    x$h$est.dist.m <- FALSE
-  }
+  # if(is.null(x$p$dist.model)) {
+  #   x$p$dist.model <- "none"
+  #   x$p$dist.exponent <- 2
+  #   x$p$dist.scale <- 1
+  #   x$p$dist.mean <- 1
+  #   x$s$dist.e <- c()
+  #   x$s$dist.s <- c()
+  #   x$s$dist.m <- c()
+  #   x$h$est.dist.s <- FALSE
+  #   x$h$est.dist.e <- FALSE
+  #   x$h$est.dist.m <- FALSE
+  # }
   
   protocoldistribution <- c(1 - classic - keepphylo - withinhost_only, classic, keepphylo, withinhost_only)
   historydistribution <- c(historydist, 1 - historydist)
   
   build_pbe(x)
-  npars <- sum(sapply(names(x$h), function(n){
-    if(grepl("est", n)){
-      return(1)
-    } else 
-      return(0)
-  }))
+  npars <- sum(grepl("est", names(x$h)))
   
   envirs <- list()
   
@@ -97,7 +95,6 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
   }
   
   message(paste0("   cycle      logLik  introductions       mu  gen.mean  sam.mean parsimony (nSNPs = ", pbe0$d$nSNPs, ")"))
-  #message(paste0("   cycle      logLik  introductions       mu  t.half  sam.mean parsimony (nSNPs = ", pbe0$d$nSNPs, ")"))
   print_screen_log(0)
   
   curtime <- Sys.time()
@@ -139,16 +136,19 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
         if (i == -4 && x$h$est.wh.s)  update_wh_slope()
         if (i == -5 && x$h$est.wh.e)  update_wh_exponent()
         if (i == -6 && x$h$est.wh.0)  update_wh_level()
-        if (i == -7 && x$h$est.wh.h)  update_wh_history()
-        if (i == -8 && x$h$est.dist.e)  update_dist_exponent()
-        if (i == -9 && x$h$est.dist.s)  update_dist_scale()
-        if (i == -10 && x$h$est.dist.m)  update_dist_mean()
-        if (i == -11 && x$h$est.ir) update_ir()
-        if (i < -11){
-          if (userenv$helpers[[-11 - i]]) {
-            userenv$updaters[[-11 - i]]()
-          }
-        }
+        if (i < -6) x$updaters[[-6 - i]]
+        # 
+        # 
+        # if (i == -7 && x$h$est.wh.h)  update_wh_history()
+        # if (i == -8 && x$h$est.dist.e)  update_dist_exponent()
+        # if (i == -9 && x$h$est.dist.s)  update_dist_scale()
+        # if (i == -10 && x$h$est.dist.m)  update_dist_mean()
+        # if (i == -11 && x$h$est.ir) update_ir()
+        # if (i < -11){
+        #   if (userenv$helpers[[-11 - i]]) {
+        #     userenv$updaters[[-11 - i]]()
+        #   }
+        # }
         
       }
       
@@ -157,8 +157,9 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
     
     if(nchains > 1 & rep %% swap == 0){
       shared_lik <- do.call(cbind, lapply(envirs, function(xx){
-        sum(xx$logLikcoal, xx$logLikgen, xx$logLiksam, xx$logLikdist, 
-            xx$logLikseq)
+        sum(sapply(names(xx)[grepl("logLik", names(xx))], function(n) xx[[n]]))
+        # sum(xx$logLikcoal, xx$logLikgen, xx$logLiksam, xx$logLikdist,
+        #     xx$logLikseq)
       }))
       
       shared_heats <- swap_heats(shared_heats, shared_lik)
@@ -193,22 +194,11 @@ burnin.phybreak <- function(...) {
 print_screen_log <- function(iteration) {
     message(paste0(
       stringr::str_pad(iteration, 8),
-      stringr::str_pad(round(sum(pbe0$logLikseq + pbe0$logLiksam + pbe0$logLikgen + pbe0$logLikcoal + pbe0$logLikdist), 2), 12),
+      stringr::str_pad(round(sum(sapply(names(pbe0)[grepl("logLik", names(pbe0))], function(n) pbe0[[n]])), 2), 12),
       stringr::str_pad(sum(pbe0$v$infectors==0), 15),
       stringr::str_pad(signif(pbe0$p$mu, 3), 9),
       stringr::str_pad(signif(pbe0$p$gen.mean, 3), 10),
       stringr::str_pad(signif(pbe0$p$sample.mean, 3), 10),
       stringr::str_pad(phangorn::parsimony(
         phybreak2phylo(environment2phybreak(pbe0$v)), pbe0$d$sequences), 10)))
-  # } else if (pbe0$p$trans.model == "sampling+culling"){
-  #   message(paste0(
-  #     stringr::str_pad(iteration, 8),
-  #     stringr::str_pad(round(pbe0$logLikseq + pbe0$logLiksam + pbe0$logLikgen + pbe0$logLikcoal + pbe0$logLikdist, 2), 12),
-  #     stringr::str_pad(signif(sum(pbe0$v$infectors==0), 1), 15),
-  #     stringr::str_pad(signif(pbe0$p$mu, 3), 9),
-  #     stringr::str_pad(signif(log((1-pbe0$p$trans.init)/pbe0$p$trans.init)/pbe0$p$trans.growth, 3), 10),
-  #     stringr::str_pad(signif(pbe0$p$sample.mean, 3), 10),
-  #     stringr::str_pad(phangorn::parsimony(
-  #       phybreak2phylo(environment2phybreak(pbe0$v)), pbe0$d$sequences), 10)))
-  # }
 }

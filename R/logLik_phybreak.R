@@ -79,25 +79,22 @@ lik_gentimes <- function(le){
   indices <- v$infectors == 0
   othercases <- v$infectors > 0
   
-  # if(length(v$inftimes) != sum(v$nodetypes=="s"))
-  #   0 + # force of infection from external source
-  #   sum(infect_distribution(v$inftimes[v$infectors > 1],
-  #                             v$inftimes[v$infectors[v$infectors > 1]],
-  #                           nodetimes = v$nodetimes[v$nodetypes=="s"][v$infectors[v$infectors>1]-1],
-  #                           cultimes = v$cultimes[v$infectors[v$infectors>1]],
-  #                           p = p,
-  #                           log = TRUE))
-  # else 
-  #print(infect_distribution())
-  return(  0 + # force of infection from external source
-      sum(dexp(diff(c(sort(v$inftimes[indices]), max(v$nodetimes))), rate = p$intro.rate, log = TRUE)) -
-      #log(p$intro.rate^(length(v$inftimes))*exp(-p$intro.rate*(max(v$nodetimes) - min(v$inftimes)))) -
-      log(p$intro.rate) +
-      sum(infect_distribution(time = v$inftimes[othercases],
-                              inftimes = v$inftimes[v$infectors[othercases]],
-                              nodetimes = v$nodetimes[v$nodetypes=="s"][v$infectors[othercases]],
-                              le = le,
-                              log = TRUE)))
+  intro.rate <- ifelse(is.null(p$intro.rate), 1, p$intro.rate)
+  R <- ifelse(is.null(p$R), 1, p$R)
+  
+  L <- 0 + # force of infection from external source
+    (- intro.rate * (max(v$nodetimes) - min(v$inftimes))) +  
+    log(intro.rate) * sum(indices) +
+    - R * length(v$infectors)
+  
+  if(p$infectivity && sum(othercases) == 0)
+    return(L)
+  else
+    return( L +
+            sum(log(R) + infect_distribution(time = v$inftimes[othercases],
+                                             inftimes = v$inftimes[v$infectors[othercases]],
+                                             nodetimes = v$nodetimes[v$nodetypes=="s"][v$infectors[othercases]],
+                                             le = le, log = TRUE)))
 }
 
 ### calculate the log-likelihood of sampling intervals 
@@ -106,27 +103,53 @@ lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes) {
 }
 
 ### calculate the log-likelihood of distances 
-lik_distances <- function(dist.model, dist.exponent, dist.scale, dist.mean, infectors, distances) {
-  if(dist.model == "none") return(0)
-  distancevector <- distances[cbind(1:length(infectors), infectors)]
-  switch(dist.model,
-         power = sum(log(
-           dist.exponent * sin(pi/dist.exponent) / 
-             (dist.scale * pi * (1 + (distancevector/dist.scale)^dist.exponent))
-           )),
-         exponential = sum(
-           log(dist.exponent) - dist.exponent * distancevector
-         ),
-         poisson = sum(
-           -dist.mean + distancevector * log(dist.mean) - lgamma(1 + distancevector)
-         )
-  )
-}
+# lik_distances <- function(dist.model, dist.exponent, dist.scale, dist.mean, infectors, distances, area) {
+#   dist.model <- ifelse(is.null(dist.model), "none", dist.model)
+#   if(dist.model == "none") return(0)
+#   distancevector <- distances[cbind(which(infectors!=0), infectors[infectors!=0])]
+#   sum((infectors == 0) * dunif(1, min = 0, max = area, log = TRUE)) + 
+#   switch(dist.model,
+#          power = sum(log(
+#            dist.exponent * sin(pi/dist.exponent) / 
+#              (dist.scale * pi * (1 + (distancevector/dist.scale)^dist.exponent))
+#            )),
+#          exponential = sum(
+#            log(dist.exponent) - dist.exponent * distancevector
+#          ),
+#          poisson = sum(
+#            -dist.mean + distancevector * log(dist.mean) - lgamma(1 + distancevector)
+#          )
+#   )
+# }
 
-### calculate the log-likelihood of introductions
-lik_introductions <- function(hist.mean, intro, time) {
-  sum(c(dpois(intro, hist.mean, log = TRUE), log(factorial(intro)), log((1/time)^(intro-1)), log(1/hist.mean)))
-}
+### calculate the log-likelihood of contacts
+# lik_contact <- function(infectors, cnt.matrix, cnt.invest.trans, cnt.invest.nontrans,
+#                         cnt.rep, cnt.rep.false) {
+#   if(is.null(cnt.matrix)) return(0)
+#   
+#   lik <- c()
+#   for(i in 1:ncol(cnt.matrix)){
+#     for(j in 1:ncol(cnt.matrix)){
+#       if (i != j){
+#         if (infectors[j] == i){
+#           if (cnt.matrix[i,j] == 1){
+#             lik <- c(lik, (1-cnt.rep.false)*cnt.invest.trans + cnt.invest.trans*cnt.rep)
+#           } else{
+#             lik <- c(lik, (1-cnt.rep.false)*(1-cnt.invest.trans) + cnt.invest.trans*(1-cnt.rep))
+#           }
+#         } else {
+#           if (cnt.matrix[i,j] == 1){
+#             lik <- c(lik, (1-cnt.invest.nontrans)*cnt.rep.false + cnt.invest.nontrans*cnt.rep)
+#           } else {
+#             lik <- c(lik, (1-cnt.invest.nontrans)*(1-cnt.rep.false) + cnt.invest.nontrans*(1-cnt.rep))
+#           }
+#         }
+#       }
+#     }
+#   }
+#   
+#   return(sum(log(lik)))
+# }
 
 ### calculate the log-likelihood of coalescent intervals 
 lik_coaltimes <- function(phybreakenv) {
@@ -137,6 +160,8 @@ lik_coaltimes <- function(phybreakenv) {
     if(min(phybreakenv$v$inftimes) - min(phybreakenv$v$nodetimes[phybreakenv$v$nodetypes == "c"]) > 
        phybreakenv$p$sample.mean + phybreakenv$p$wh.level/phybreakenv$p$wh.slope) return(-Inf)
   }
+  
+  mult.intro <- ifelse(is.null(phybreakenv$p$mult.intro), FALSE, phybreakenv$p$mult.intro)
   
   remove0nodes <- phybreakenv$v$nodetypes != "0"
   nodetypes <- phybreakenv$v$nodetypes[remove0nodes]
@@ -156,7 +181,7 @@ lik_coaltimes <- function(phybreakenv) {
   nrlineages <- 1 + cumsum(dlineage)
   
   whtimes <- nodetimes[orderednodes] - inftimes[orderedhosts + 1]
-  if(phybreakenv$p$mult.intro) whtimes[orderedhosts == 0] <- whtimes[orderedhosts == 0] - min(whtimes[orderedhosts == 0])
+  if(mult.intro) whtimes[orderedhosts == 0] <- whtimes[orderedhosts == 0] - min(whtimes[orderedhosts == 0])
   whtimes[c(!duplicated(orderedhosts)[-1], FALSE)] <- 0
   
   logcoalrates <- switch(phybreakenv$p$wh.model, single =, infinite =,
@@ -172,7 +197,7 @@ lik_coaltimes <- function(phybreakenv) {
                        exponential  = -1/(phybreakenv$p$wh.level * phybreakenv$p$wh.exponent * 
                                             exp(phybreakenv$p$wh.exponent * whtimes)),
                        constant = whtimes/phybreakenv$p$wh.level)
-  if (phybreakenv$p$mult.intro) {
+  if (mult.intro) {
     logcoalrates[orderedhosts[coalnodes] == 0] <- -log(phybreakenv$p$wh.history)
     cumcoalrates[orderedhosts == 0] <- whtimes[orderedhosts == 0]/phybreakenv$p$wh.history
   }

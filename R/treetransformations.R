@@ -154,7 +154,7 @@ phybreak2trans <- function(vars, hostnames = c(), reference.date = 0,
 
 transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL, 
                                 introductions = 1, NJtree = FALSE) {
-  
+
   ### extract and order samples
   refdate <- min(vars$sample.times)
   samtimes <- vars$sample.times - refdate
@@ -201,7 +201,7 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
   if(is.null(vars$sim.infection.times) | is.null(vars$sim.infectors) | resample) {
     resample <- TRUE
     inftimes <- .rinftimes(samtimes[1:nhosts], resamplepars$sample.mean, resamplepars$sample.shape)
-    infectors <- .rinfectors(inftimes, introductions, p = resamplepars, 
+    infectors <- .rinfectors(inftimes, introductions, d = c(vars, reference.date = refdate), p = resamplepars, 
                                v = list(nodetimes = samtimes))
   } else {
     inftimes <- as.numeric(vars$sim.infection.times - refdate)
@@ -252,6 +252,8 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
   
       if(resamplepars$wh.bottleneck == "wide") {
         invisible(sapply(1:nhosts, rewire_pullnodes_wide))
+      } else if (introductions == 1){
+        invisible(sapply(0:nhosts, rewire_pullnodes_complete))
       } else {
         invisible(sapply(0:nhosts, rewire_pullnodes_complete))
       }
@@ -385,13 +387,13 @@ whichgeneration <- function(infectors, hostID) {
 }
 
 ### random infectors given infection times and generation interval distribution
-.rinfectors <- function(it, introductions, p, v) {
+.rinfectors <- function(it, introductions, d, p, v) {
   ### tests
   if(class(it) != "numeric" && class(it) != "integer") {
     stop(".rinfectors called with non-numeric infection times")
   }
   if(sum(it == min(it)) > introductions) stop("rinfectors with too many index cases")
-  if(p$trans.model ==  "gamma"){
+  if(is.null(p$trans.model)){
     if(p$gen.mean <= 0) stop(".rinfectors called with non-positive mean generation interval")
     if(p$gen.shape <= 0) stop(".rinfectors called with non-positive shape parameter")
   }
@@ -402,7 +404,8 @@ whichgeneration <- function(infectors, hostID) {
     if(it[i] > min(it)) {
       dist <- infect_distribution(it[i], it,
                                   nodetimes = v$nodetimes[1:length(it)], 
-                                  le = list(p=p, v=c(v, list(inftimes = it))))
+                                  le = list(d=d, p=p, v=c(v, list(inftimes = it))))
+      
       dist[i] <- 0
       if(all(dist == 0))
         res[i] <- 0
@@ -445,7 +448,7 @@ get_history_minitree <- function(vars, nsamples, nhosts){
     sequences <- vars$sequences
   }
   
-  phytree <- midpoint(acctran(NJ(dist.hamming(sequences)), sequences))
+  phytree <- midpoint(acctran(NJ(dist.dna(as.DNAbin(sequences), model = "N")), sequences))
   labels <- sapply(which(phytree$edge[,2] %in% 1:nhosts), function(x){
     return(as.numeric(phytree$tip.label[phytree$edge[x,2]]))
   })
