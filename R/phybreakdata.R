@@ -17,7 +17,7 @@
 #'  coordinates (two-column \code{matrix} or \code{data.frame}).
 #' @param host.names A vector with host names. The vector identifies the host for each sample, so should be of the same
 #'  length as \code{sample.times}. 
-#' @param culling.times A vector with culling dates. The vector identifies the culling date for each sample, so should be of
+#' @param removal.times A vector with removal dates. The vector identifies the removal date for each sample, so should be of
 #'  of the same length as \code{sample.times}.
 #' @param sim.infection.times A vector with infection times (\code{numerical} or \code{Date}).
 #' @param sim.infectors A vector with infectors, either by name or by position (use 0 for the index case).
@@ -27,7 +27,7 @@
 #'     \item{sequences}{a \code{'phyDat'}-object with the sequence data.}
 #'     \item{sample.times}{a named \code{vector} with the sample times.}
 #'     \item{sample.hosts}{a named \code{vector} with the hosts from whom the samples have been taken.}
-#'     \item{culling.timese}{a named \code{vector} with the dates of culling of the hosts.}
+#'     \item{removal.timese}{a named \code{vector} with the dates of removal of the hosts.}
 #'     \item{distances}{a named distance matrix (class \code{dist}) with the mutual distances.}
 #'     \item{sim.infection.times}{a named \code{vector} with the (simulated) infection times (if provided).}
 #'     \item{sim.infectors}{a named \code{vector} with the (simulated) infectors (if provided).}
@@ -46,7 +46,7 @@
 #' dataset <- phybreakdata(sequences = sampleSNPdata, sample.times = sampletimedata)
 #' @export
 phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL,
-                         culling.times = NULL, sample.names = NULL, host.names = sample.names, 
+                         removal.times = NULL, sample.names = NULL, host.names = sample.names, 
                          sim.infection.times = NULL, sim.infectors = NULL, sim.tree = NULL) {
   
   ##########################################################
@@ -67,9 +67,9 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL
   if(!inherits(sample.times, c("Date", "numeric", "integer"))) {
     stop("sample.times should be numeric or of class \"Date\"")
   }
-  if(!is.null(culling.times))
-    if(!inherits(culling.times, c("Date", "numeric", "integer"))) {
-      stop("culling.times shoud be numeric or of class \"Date")
+  if(!is.null(removal.times))
+    if(!inherits(removal.times, c("Date", "numeric", "integer"))) {
+      stop("removal.times shoud be numeric or of class \"Date")
     }
   if(nrow(sequences) != length(sample.times)) {
     stop("numbers of sequences and sample.times don't match")
@@ -234,24 +234,24 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL
     }
   }
   
-  ### culling data ###
+  ### removal data ###
   
-  if(!is.null(culling.times)){
-    if(class(culling.times) != class(sample.times)) {
-      stop("culling.times should be of same class as sample.times")
+  if(!is.null(removal.times)){
+    if(class(removal.times) != class(sample.times)) {
+      stop("removal.times should be of same class as sample.times")
     }
-    culling.times <- culling.times[allfirsttimes][outputorderhosts]
+    removal.times <- removal.times[allfirsttimes][outputorderhosts]
     
-    if(is.null(names(culling.times))) {
-      names(culling.times) <- orderedhosts
-    } else if (all(names(culling.times) %in% orderedhosts)) {
-      culling.times <- culling.times[orderedhosts]
+    if(is.null(names(removal.times))) {
+      names(removal.times) <- orderedhosts
+    } else if (all(names(removal.times) %in% orderedhosts)) {
+      removal.times <- removal.times[orderedhosts]
     } else {
-      warning("names in culling.times don't match host.names and are therefore overwritten")
-      culling.times <- culling.times[outputorderhosts]
-      names(culling.times) <- orderedhosts
+      warning("names in removal.times don't match host.names and are therefore overwritten")
+      removal.times <- removal.times[outputorderhosts]
+      names(removal.times) <- orderedhosts
     }
-    res <- c(res, list(culling.times = culling.times))
+    res <- c(res, list(removal.times = removal.times))
   }
   
   ### Conctact data ###
@@ -269,7 +269,7 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL
       rownames(contact) <- allhosts
       colnames(contact) <- allhosts
     }
-    if (all(names(culling.times) %in% orderedhosts)) {
+    if (all(names(removal.times) %in% orderedhosts)) {
       contact <- contact[match(rownames(contact), orderedhosts),match(rownames(contact), orderedhosts)]
     } else {
       warning("names in contact don't match host.names and are therefore overwritten")

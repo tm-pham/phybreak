@@ -156,7 +156,39 @@ introductions_functions <- function(le){
       accept_pbe("ir")
     }
   }
-  le$updaters[["update_R"]] <- function(){}
+
+  le$updaters[["update_R"]] <- function(){
+     ### create an up-to-date proposal-environment
+    prepare_pbe()
+    
+    ### making variables and parameters available within the function
+    le <- environment()
+    h <- pbe0$h
+    p <- pbe1$p
+    v <- pbe1$v
+    
+    ### check whether to estimate
+    if(!h$est.ir) return()
+    
+    p$R <- exp(log(p$R) + rnorm(1, 0, h$si.ir))
+    
+    ### update proposal environment
+    copy2pbe1("p", le)
+    
+    ### calculate proposalratio
+    logproposalratio <- log(p$R) - log(pbe0$p$R)
+    
+    ### calculate likelihood
+    propose_pbe("R")
+    
+    ### calculate acceptance probability
+    logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio
+    
+    ### accept
+    if (runif(1) < exp(logaccprob)) {
+      accept_pbe("R")
+    }
+  }
   
   return(le)
 }
@@ -370,7 +402,7 @@ spatial_functions <- function(le){
 #' @export
 contact_parameters <- function(le,
     cnt.invest.trans = 1, cnt.invest.nontrans = 0.5, cnt.report = 1, cnt.report.false = 0,
-    cnt.types = c(0.5, 0.5), est.cnt.types = T,
+    cnt.types = c(0.5, 0.5), est.cnt.types = F,
     est.cnt.invest.trans = T, est.cnt.invest.nontrans = T, est.cnt.report = T,
     prior.cnt.eta.alpha = 1, prior.cnt.eta.beta = 1,
     prior.cnt.lambda.alpha = 1, prior.cnt.lambda.beta = 1,
@@ -416,53 +448,53 @@ contact_parameters <- function(le,
 contact_functions <- function(le){
   
   # calculate the log-likelihood of contacts
-  le$likelihoods[["logLikcontact"]] <- function(le){#infectors, cnt.matrix, cnt.invest.trans, cnt.invest.nontrans,
-                                          #cnt.rep, cnt.rep.false) {
+  # le$likelihoods[["logLikcontact"]] <- function(le){#infectors, cnt.matrix, cnt.invest.trans, cnt.invest.nontrans,
+  #                                         #cnt.rep, cnt.rep.false) {
 
-    lik <- with(le, {
-    #   if(is.null(d$contact)) return(0)
-      lik <- unlist(lapply(seq_len(dim(contactarray)[3]), function(i){
-        mat <- contactarray[,,i]
-        diag(mat) <- NA
-        mat <- mat #* p$cnt.types[i]
-        return(mat)
-      }))
-      lik <- lik[!is.na(lik)]
+  #   lik <- with(le, {
+  #   #   if(is.null(d$contact)) return(0)
+  #     lik <- unlist(lapply(seq_len(dim(contactarray)[3]), function(i){
+  #       mat <- contactarray[,,i]
+  #       diag(mat) <- NA
+  #       mat <- mat #* p$cnt.types[i]
+  #       return(mat)
+  #     }))
+  #     lik <- lik[!is.na(lik)]
 
-      # lik <- c()
-      # for(i in seq_len(ncol(d$contact))){
-      #   for(j in seq_len(ncol(d$contact))){
-      #     if (i != j){
-      #       if (v$infectors[j] == i){
-      #         #tau <- floor(v$inftimes[j])
-      #         if (d$contact[i,j] == 1){
-      #           lik <- c(lik, ((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon)) # * contact.probs[categories[i], categories[j]])
-      #         } else{
-      #           lik <- c(lik, (1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon)) #* (1-contact.probs[categories[i], categories[j]]))
-      #         }
-      #       } else if (v$infectors[i] == j){
-      #         #tau <- floor(v$inftimes[i])
-      #         if (d$contact[j,i] == 1){
-      #           lik <- c(lik, ((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon)) #* contact.probs[categories[i], categories[j]])
-      #         } else{
-      #           lik <- c(lik, (1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon)) #* (1-contact.probs[categories[i], categories[j]]))
-      #         }
-      #       } else {
-      #         if (d$contact[i,j] == 1){
-      #           lik <- c(lik, (1-p$cnt.lambda)*p$cnt.zeta + p$cnt.lambda * p$cnt.epsilon) #* contact.probs[categories[i], categories[j]])
-      #         } else {
-      #           lik <- c(lik, (1-p$cnt.lambda)*(1-p$cnt.zeta) + p$cnt.lambda * (1-p$cnt.epsilon)) #* (1-contact.probs[categories[i], categories[j]]))
-      #         }
-      #       }
-      #     }
-      #   }
-      # }
-      #if (any(lik == 0)) stop("zeros in likelihood")
-      #print(ifelse(is.infinite(sum(log(lik))), -1e5, sum(log(lik))))
-      return(ifelse(is.infinite(sum(log(lik))), -1e5, sum(log(lik))))
-    })
-    return(lik)
-  }
+  #     # lik <- c()
+  #     # for(i in seq_len(ncol(d$contact))){
+  #     #   for(j in seq_len(ncol(d$contact))){
+  #     #     if (i != j){
+  #     #       if (v$infectors[j] == i){
+  #     #         #tau <- floor(v$inftimes[j])
+  #     #         if (d$contact[i,j] == 1){
+  #     #           lik <- c(lik, ((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon)) # * contact.probs[categories[i], categories[j]])
+  #     #         } else{
+  #     #           lik <- c(lik, (1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon)) #* (1-contact.probs[categories[i], categories[j]]))
+  #     #         }
+  #     #       } else if (v$infectors[i] == j){
+  #     #         #tau <- floor(v$inftimes[i])
+  #     #         if (d$contact[j,i] == 1){
+  #     #           lik <- c(lik, ((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon)) #* contact.probs[categories[i], categories[j]])
+  #     #         } else{
+  #     #           lik <- c(lik, (1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon)) #* (1-contact.probs[categories[i], categories[j]]))
+  #     #         }
+  #     #       } else {
+  #     #         if (d$contact[i,j] == 1){
+  #     #           lik <- c(lik, (1-p$cnt.lambda)*p$cnt.zeta + p$cnt.lambda * p$cnt.epsilon) #* contact.probs[categories[i], categories[j]])
+  #     #         } else {
+  #     #           lik <- c(lik, (1-p$cnt.lambda)*(1-p$cnt.zeta) + p$cnt.lambda * (1-p$cnt.epsilon)) #* (1-contact.probs[categories[i], categories[j]]))
+  #     #         }
+  #     #       }
+  #     #     }
+  #     #   }
+  #     # }
+  #     #if (any(lik == 0)) stop("zeros in likelihood")
+  #     #print(ifelse(is.infinite(sum(log(lik))), -1e5, sum(log(lik))))
+  #     return(ifelse(is.infinite(sum(log(lik))), -1e5, sum(log(lik))))
+  #   })
+  #   return(lik)
+  # }
 
   le$updaters[["update_cnt_eta"]] <- function(){
     ### create an up-to-date proposal-environment
@@ -633,6 +665,12 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     
     # If removal times are present, use adjusted Gamma distribution
     # Dataslot
+    if (is.null(removal.times)) {
+      if (!is.null(le$dataset$removal.times)) {
+        removal.times = le$dataset$removal.times
+      }
+    }
+
     le$dataslot <- c(le$dataslot, list(
       admission.times = admission.times,
       removal.times = removal.times
@@ -721,8 +759,13 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
   
   else {
   # Check for removal times
-  if (is.null(removal.times))
-    stop("Provide removal times in same order as hosts")
+  if (is.null(removal.times)){
+    if (!is.null(le$dataset$removal.times)) {
+      removal.times = le$dataset$removal.times
+    } else {
+      stop("Provide removal times in same order as hosts")
+    }
+  }
   
   # Load user-defined infectivity
   # if(trans.model == "user") {

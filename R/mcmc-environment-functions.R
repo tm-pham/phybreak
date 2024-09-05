@@ -121,7 +121,7 @@ build_pbe <- function(phybreak.obj) {
     for (i in seq_len(dim(contactarray)[3])){
       for(host_i in seq_len(ncol(contactarray[,,i]))){
         for(host_j in seq_len(ncol(contactarray[,,i]))){
-          contactarray[host_i,host_j,i] <- phybreak:::get_contact_probability(contactarray[,,i], host_i, host_j, le)
+          contactarray[host_i,host_j,i] <- phybreak:::get_contact_probability(d$contact, host_i, host_j, le)
         }
       }
     }
@@ -359,27 +359,30 @@ get_contact_probability <- function(contact, host_i, host_j, le){
   v = le$v
   p = le$p
   if (host_i != host_j){
-    #tau <- ifelse(dim(contactarray)[3] == 1, 1, floor(v$inftimes[host_j]))
-    if (v$infectors[host_j] == host_i || v$infectors[host_i] == host_j){
-      if (contact[host_i,host_j] == 1){
-        return((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon)
-      } else{
-        return((1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon))
-      }
-    # } else if (v$infectors[host_i] == host_j){
-    #   tau <- ifelse(dim(contactarray)[3] == 1, 1, floor(v$inftimes[host_j]))
-    #   if (d$contact[[tau]][j,i] == 1){
-    #     lik <- c(lik, ((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon) * contact.probs[categories[i], categories[j]])
+    if (contact[host_i, host_j] == 0) return(p$cnt.eta * (1-p$cnt.epsilon))
+    else if (contact[host_i, host_j] == 1) return(p$cnt.eta * (1-p$cnt.zeta))
+
+    # #tau <- ifelse(dim(contactarray)[3] == 1, 1, floor(v$inftimes[host_j]))
+    # if (v$infectors[host_j] == host_i || v$infectors[host_i] == host_j){
+    #   if (contact[host_i,host_j] == 1){
+    #     return((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon)
     #   } else{
-    #     lik <- c(lik, (1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon) * (1-contact.probs[categories[i], categories[j]]))
+    #     return((1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon))
     #   }
-    } else {
-      if (contact[host_i,host_j] == 1){
-        return((1-p$cnt.lambda)*p$cnt.zeta + p$cnt.lambda * p$cnt.epsilon)
-      } else {
-        return((1-p$cnt.lambda)*(1-p$cnt.zeta) + p$cnt.lambda * (1-p$cnt.epsilon))
-      }
-    }
+    # # } else if (v$infectors[host_i] == host_j){
+    # #   tau <- ifelse(dim(contactarray)[3] == 1, 1, floor(v$inftimes[host_j]))
+    # #   if (d$contact[[tau]][j,i] == 1){
+    # #     lik <- c(lik, ((1-p$cnt.eta)*p$cnt.zeta + p$cnt.eta * p$cnt.epsilon) * contact.probs[categories[i], categories[j]])
+    # #   } else{
+    # #     lik <- c(lik, (1-p$cnt.eta)*(1-p$cnt.zeta) + p$cnt.eta*(1-p$cnt.epsilon) * (1-contact.probs[categories[i], categories[j]]))
+    # #   }
+    # } else {
+    #   if (contact[host_i,host_j] == 1){
+    #     return((1-p$cnt.lambda)*p$cnt.zeta + p$cnt.lambda * p$cnt.epsilon)
+    #   } else {
+    #     return((1-p$cnt.lambda)*(1-p$cnt.zeta) + p$cnt.lambda * (1-p$cnt.epsilon))
+    #   }
+    # }
   } else {
     return(1)
   }
