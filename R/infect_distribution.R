@@ -45,6 +45,7 @@ infect_distribution <- function(time, inftimes, le,
     #print(list(time, inftimes, le, nodetimes, host, log))
     prob <- le$p$inf_function(time, inftimes, le, 
                               nodetimes, host, log)
+    return(prob)
   }
 
   if (le$p$contact){

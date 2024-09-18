@@ -758,140 +758,140 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
   }
   
   else {
-  # Check for removal times
-  if (is.null(removal.times)){
-    if (!is.null(le$dataset$removal.times)) {
-      removal.times = le$dataset$removal.times
-    } else {
-      stop("Provide removal times in same order as hosts")
-    }
-  }
-  
-  # Load user-defined infectivity
-  # if(trans.model == "user") {
-  #   if(is.null(infectivity_file))
-  #     stop("Please provide a R file stating the infectivity function")
-  #   else 
-  #     source(infectivity_file, local = userenv)
-  # } else {
-  #   datas <- NULL
-  #   parameters <- NULL
-  #   helpers <- NULL
-  #   samplers <- NULL
-  # }
-
-  #Add data for user-defined function
-  le$dataslot <- c(le$dataslot, list(
-    removal.times = removal.times
-  ))
-  
-  # Parameterslot
-  le$parameterslot <- c(le$parameterslot, list(
-    trans.init = 1e-4,
-    trans.removal = 5,
-    trans.growth = trans.growth,
-    trans.sample = 1,
-    trans.model = "user",
-    infectivity = TRUE
-  ))
-  
-  # Helperslot
-  le$helperslot <- c(le$helperslot, userenv$helperslot)
-  
-  # Sampleslot
-  le$sampleslot <- c(le$sampleslot, userenv$sampleslot)
-  
-  # Infectivity function
-  le$parameterslot[["inf_function"]] <- infect_function <- function(time, inftimes, le, nodetimes, 
-                                                                    host, log = FALSE,
-                                                                    test.arguments = FALSE){
-    
-    d <- le$d
-    p <- le$p
-    v <- le$v
-    
-    if (is.null(d$removal.times)) {
-      stop("removal times of hosts must be provided")
-    } else {
-      removal.times <- d$removal.times
-      if(class(removal.times[1]) == "Date"){
-        removal.times <- as.numeric(removal.times - d$reference.date)
-      }
-    }
-    
-    if(test.arguments) return()
-    
-    if(is.null(p$trans.init))
-      stop("initial fraction infected is missing")
-    if(is.null(p$trans.growth))
-      stop("growth factor of infectiousness is missing")
-    if(is.null(p$trans.sample))
-      stop("reduction factor after first positive sample is missing")
-    if(is.null(p$trans.removal))
-      stop("decay factor after removal is missing")
-    
-    a <- (1-p$trans.init)/p$trans.init
-    r <- p$trans.growth
-    S <- p$trans.sample
-    C <- p$trans.removal
-    
-    # Calculate normalization factor by calculating mean AUC of infectiousness function
-    AUCs <- unlist(lapply(1:length(v$inftimes), function(i){
-      samtime = v$nodetimes[i] - v$inftimes[i]
-      cultime = removal.times[i] - v$inftimes[i]
-      if (r*samtime < 100){
-        probs = sum((log(a+exp(r*samtime)) - log(a+1)) / r,
-                    S * ( log(a+exp(r*cultime)) - log(a+exp(r*samtime)) ) / r,
-                    (S / (1 + a*exp(-r*cultime))) / C)
+    # Check for removal times
+    if (is.null(removal.times)){
+      if (!is.null(le$dataset$removal.times)) {
+        removal.times = le$dataset$removal.times
       } else {
-        probs = sum((r*samtime - log(a+1)) / r,
-                    S * ( r*(cultime - samtime) ) / r,
-                    S / C)
-      }
-      return(probs)
-    }))
-    norm_factor <- 1/mean(AUCs)
-    
-    # Use removal times of infectors in rest of calculations
-    cultimes <- removal.times[match(inftimes, v$inftimes)]
-    samtimes <- as.numeric(nodetimes - inftimes)
-    cultimes <- as.numeric(cultimes - inftimes)
-    hosttimes <- as.numeric(time - inftimes)
-    
-    if (length(hosttimes) == 0){
-      probs = 1
-    } else {
-      
-      if(is.null(host)){
-        if(length(hosttimes) != length(nodetimes)){
-          probs <- 0.1
-          j <- 1
-        } else {
-          probs <- c()
-          j <- 0
-        }
-        for (i in 1:length(samtimes)){
-          if(hosttimes[i+j] < 0)
-            probs <- c(probs, 0)
-          else if(hosttimes[i+j] < samtimes[i])
-            probs <- c(probs, 1/(1+a*exp(-r*hosttimes[i+j])))
-          else if(hosttimes[i+j] >= samtimes[i] & hosttimes[i+j] < cultimes[i])
-            probs <- c(probs, S/(1+a*exp(-r*hosttimes[i+j])))
-          else if(hosttimes[i+j] >= cultimes[i] & hosttimes[i+j] < cultimes[i] + 5)
-            probs <- c(probs, S/(1+a*exp(-r*cultimes[i])) * exp(-C*(hosttimes[i+j]-cultimes[i])))
-          else 
-            probs <- c(probs, 0)
-        }
+        stop("Provide removal times in same order as hosts")
       }
     }
     
-    if(log)
-      return(log(probs*norm_factor))
-    else
-      return(probs*norm_factor)
-  }
-  
-  return(le)
+    # Load user-defined infectivity
+    # if(trans.model == "user") {
+    #   if(is.null(infectivity_file))
+    #     stop("Please provide a R file stating the infectivity function")
+    #   else 
+    #     source(infectivity_file, local = userenv)
+    # } else {
+    #   datas <- NULL
+    #   parameters <- NULL
+    #   helpers <- NULL
+    #   samplers <- NULL
+    # }
+
+    #Add data for user-defined function
+    le$dataslot <- c(le$dataslot, list(
+      removal.times = removal.times
+    ))
+    
+    # Parameterslot
+    le$parameterslot <- c(le$parameterslot, list(
+      trans.init = 1e-4,
+      trans.removal = 5,
+      trans.growth = trans.growth,
+      trans.sample = 1,
+      trans.model = "user",
+      infectivity = TRUE
+    ))
+    
+    # Helperslot
+    le$helperslot <- c(le$helperslot, userenv$helperslot)
+    
+    # Sampleslot
+    le$sampleslot <- c(le$sampleslot, userenv$sampleslot)
+    
+    # Infectivity function
+    le$parameterslot[["inf_function"]] <- infect_function <- function(time, inftimes, le, nodetimes, 
+                                                                      host, log = FALSE,
+                                                                      test.arguments = FALSE){
+      
+      d <- le$d
+      p <- le$p
+      v <- le$v
+      
+      if (is.null(d$removal.times)) {
+        stop("removal times of hosts must be provided")
+      } else {
+        removal.times <- d$removal.times
+        if(class(removal.times[1]) == "Date"){
+          removal.times <- as.numeric(removal.times - d$reference.date)
+        }
+      }
+      
+      if(test.arguments) return()
+      
+      if(is.null(p$trans.init))
+        stop("initial fraction infected is missing")
+      if(is.null(p$trans.growth))
+        stop("growth factor of infectiousness is missing")
+      if(is.null(p$trans.sample))
+        stop("reduction factor after first positive sample is missing")
+      if(is.null(p$trans.removal))
+        stop("decay factor after removal is missing")
+      
+      a <- (1-p$trans.init)/p$trans.init
+      r <- p$trans.growth
+      S <- p$trans.sample
+      C <- p$trans.removal
+      
+      # Calculate normalization factor by calculating mean AUC of infectiousness function
+      AUCs <- unlist(lapply(1:length(v$inftimes), function(i){
+        samtime = v$nodetimes[i] - v$inftimes[i]
+        cultime = removal.times[i] - v$inftimes[i]
+        if (r*samtime < 100){
+          probs = sum((log(a+exp(r*samtime)) - log(a+1)) / r,
+                      S * ( log(a+exp(r*cultime)) - log(a+exp(r*samtime)) ) / r,
+                      (S / (1 + a*exp(-r*cultime))) / C)
+        } else {
+          probs = sum((r*samtime - log(a+1)) / r,
+                      S * ( r*(cultime - samtime) ) / r,
+                      S / C)
+        }
+        return(probs)
+      }))
+      norm_factor <- 1/mean(AUCs)
+      
+      # Use removal times of infectors in rest of calculations
+      cultimes <- removal.times[match(inftimes, v$inftimes)]
+      samtimes <- as.numeric(nodetimes - inftimes)
+      cultimes <- as.numeric(cultimes - inftimes)
+      hosttimes <- as.numeric(time - inftimes)
+      
+      if (length(hosttimes) == 0){
+        probs = 1
+      } else {
+        
+        if(is.null(host)){
+          if(length(hosttimes) != length(nodetimes)){
+            probs <- 0.1
+            j <- 1
+          } else {
+            probs <- c()
+            j <- 0
+          }
+          for (i in 1:length(samtimes)){
+            if(hosttimes[i+j] < 0)
+              probs <- c(probs, 0)
+            else if(hosttimes[i+j] < samtimes[i])
+              probs <- c(probs, 1/(1+a*exp(-r*hosttimes[i+j])))
+            else if(hosttimes[i+j] >= samtimes[i] & hosttimes[i+j] < cultimes[i])
+              probs <- c(probs, S/(1+a*exp(-r*hosttimes[i+j])))
+            else if(hosttimes[i+j] >= cultimes[i] & hosttimes[i+j] < cultimes[i] + 5)
+              probs <- c(probs, S/(1+a*exp(-r*cultimes[i])) * exp(-C*(hosttimes[i+j]-cultimes[i])))
+            else 
+              probs <- c(probs, 0)
+          }
+        }
+      }
+      
+      if(log)
+        return(log(probs*norm_factor))
+      else
+        return(probs*norm_factor)
+    }
+    
+    return(le)
   }
 }
 
