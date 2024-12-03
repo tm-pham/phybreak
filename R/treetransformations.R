@@ -405,9 +405,7 @@ whichgeneration <- function(infectors, hostID) {
       dist <- infect_distribution(it[i], it,
                                   nodetimes = v$nodetimes[1:length(it)], 
                                   le = list(d=d, p=p, v=c(v, list(inftimes = it))))
-      cat("i = ", i)
       dist[i] <- 0
-      cat("dist = ", dist)
       if(all(dist == 0))
         res[i] <- 0
       else
