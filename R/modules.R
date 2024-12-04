@@ -802,6 +802,7 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     le$sampleslot <- c(le$sampleslot, userenv$sampleslot)
     
     # Infectivity function
+    # Changed inf_function instead of infect_function
     le$parameterslot[["inf_function"]] <- inf_function <- function(time, inftimes, le, nodetimes, 
                                                                       host, log = FALSE,
                                                                       test.arguments = FALSE){
@@ -860,7 +861,7 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
       
       if (length(hosttimes) == 0){
         probs = 1
-      } else {
+      }else{
         
         if(is.null(host)){
           if(length(hosttimes) != length(nodetimes)){
@@ -885,10 +886,12 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
         }
       }
       
-      if(log)
+      if(log){
         return(log(probs*norm_factor))
-      else
+      }else{
         return(probs*norm_factor)
+      }
+
     }
     
     return(le)
