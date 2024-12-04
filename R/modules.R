@@ -692,7 +692,7 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
       removal.rate = c()
     ))
     
-    le$parameterslot[["inf_function"]] <- inf_function <- function(time, inftimes, le, nodetimes, 
+    le$parameterslot[["inf_function"]] <- function(time, inftimes, le, nodetimes, 
                                                    host, log = FALSE,
                                                    test.arguments = FALSE){
       
@@ -803,7 +803,7 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     
     # Infectivity function
     # Changed inf_function instead of infect_function
-    le$parameterslot[["inf_function"]] <- inf_function <- function(time, inftimes, le, nodetimes, 
+    le$parameterslot[["inf_function"]] <- function(time, inftimes, le, nodetimes, 
                                                                       host, log = FALSE,
                                                                       test.arguments = FALSE){
       
