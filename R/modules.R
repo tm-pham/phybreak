@@ -26,6 +26,9 @@ add_modules_to_phybreak <- function(le,
     if(contact) le <- do.call(contact_parameters, c(le, extras.contact))
     else le$parameterslot$contact = FALSE
     
+    cat("Check removal.times in modules: ", extras$removal.times, "\n")
+    
+    
     if(infectivity | !is.null(extras$infectivity_file) | !is.null(extras$removal.times)){ 
       cat("Test: infectivity is called.\n")
       le <- do.call(infectivity_parameters, c(le, extras.infectivity))
