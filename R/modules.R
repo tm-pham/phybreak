@@ -8,9 +8,6 @@ add_modules_to_phybreak <- function(le,
                                     phyb.obj = TRUE, ...){
   
   extras <- list(...)
-  cat("extras in modules: ", names(extras), "\n")
-  cat("str of extras in modules: ", str(extras), "\n")
-  cat("Check removal.times in modules: ", extras$removal.times, "\n")
   extras.introductions <- extras[names(extras) %in% names(as.list(args(introductions_parameters)))]
   extras.spatial <- extras[names(extras) %in% names(as.list(args(spatial_parameters)))]
   extras.contact <- extras[names(extras) %in% names(as.list(args(contact_parameters)))]
