@@ -249,7 +249,7 @@ phybreak <- function(dataset, times = NULL,
   ############################### 
 
   add_modules_to_phybreak(le, ...)
-  
+  cat("Check if inf_function was created: ", le$parameterslot$inf_function, "\n")
   dataslot <- le$dataslot
   if (!is.null(dataslot$removal.times)) dataset$removal.times <- dataslot$removal.times
   
