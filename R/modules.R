@@ -692,7 +692,6 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     le$sampleslot <- c(le$sampleslot, list(
       removal.rate = c()
     ))
-    cat("trans model gamma: infectivity_parameters is called. Creating inf_function. \n")
     le$parameterslot[["inf_function"]] <- function(time, inftimes, le, nodetimes, 
                                                    host, log = FALSE,
                                                    test.arguments = FALSE){
@@ -804,7 +803,6 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     
     # Infectivity function
     # Changed inf_function instead of infect_function
-    cat("trans model user: infectivity_parameters is called. Creating inf_function. \n")
     le$parameterslot[["inf_function"]] <- function(time, inftimes, le, nodetimes, 
                                                                       host, log = FALSE,
                                                                       test.arguments = FALSE){
