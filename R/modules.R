@@ -26,10 +26,10 @@ add_modules_to_phybreak <- function(le,
     if(contact) le <- do.call(contact_parameters, c(le, extras.contact))
     else le$parameterslot$contact = FALSE
     
-    if(infectivity | !is.null(extras$infectivity_file) | !is.null(extras$removal.times)) 
+    if(infectivity | !is.null(extras$infectivity_file) | !is.null(extras$removal.times)){ 
       cat("Test: infectivity is called.\n")
       le <- do.call(infectivity_parameters, c(le, extras.infectivity))
-    else le$parameterslot$infectivity = FALSE
+    }else le$parameterslot$infectivity = FALSE
     
   } else {
     le[["likelihoods"]] <- list()
