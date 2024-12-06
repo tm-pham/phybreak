@@ -679,7 +679,8 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     # Parameterslot
     le$parameterslot <- c(le$parameterslot, list(
       infectivity = TRUE,
-      removal.rate = 5
+      # removal.rate = 5
+      removal.rate = 100
     ))
     
     # Helperslot
