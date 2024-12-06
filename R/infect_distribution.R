@@ -35,7 +35,7 @@ infect_distribution <- function(time, inftimes, le,
                       scale = le$p$gen.mean/le$p$gen.shape,
                       log = FALSE)
     } else {
-      inf_func <- le$p$inf_function
+      # inf_func <- le$p$inf_function
       prob <- le$p$inf_function(time, inftimes, le,
                                 nodetimes, host, log)
       # prob <- inf_func(time, inftimes, le,
@@ -46,7 +46,7 @@ infect_distribution <- function(time, inftimes, le,
   ### User-defined generation distribution ###
   } else if(trans.model =="user") {
     #print(list(time, inftimes, le, nodetimes, host, log))
-    inf_func <- le$p$inf_function
+    # inf_func <- le$p$inf_function
     prob <- le$p$inf_function(time, inftimes, le,
                               nodetimes, host, log)
     # prob <- inf_func(time, inftimes, le, 
