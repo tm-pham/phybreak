@@ -76,5 +76,5 @@ infect_distribution <- function(time, inftimes, le,
       else return(prob * prob.cnt)
     }
   }
-  return(prob)
+  # return(prob)
 }
