@@ -788,7 +788,7 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     le$parameterslot <- c(le$parameterslot, list(
       trans.init = 1e-4,
       # 
-      trans.removal = 10,
+      trans.removal = 100,
       trans.growth = trans.growth,
       trans.sample = 1,
       trans.model = "user",
