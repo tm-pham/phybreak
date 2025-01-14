@@ -682,8 +682,8 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     # Parameterslot
     le$parameterslot <- c(le$parameterslot, list(
       infectivity = TRUE,
-      # removal.rate = 5
-      removal.rate = 100
+      removal.rate = 5
+      # removal.rate = 100
     ))
     
     # Helperslot
@@ -792,7 +792,7 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     le$parameterslot <- c(le$parameterslot, list(
       trans.init = 1e-4,
       # 
-      trans.removal = 100,
+      trans.removal = 5,
       trans.growth = trans.growth,
       trans.sample = 1,
       trans.model = "user",
@@ -882,8 +882,8 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
               probs <- c(probs, 1/(1+a*exp(-r*hosttimes[i+j])))
             else if(hosttimes[i+j] >= samtimes[i] & hosttimes[i+j] < cultimes[i])
               probs <- c(probs, S/(1+a*exp(-r*hosttimes[i+j])))
-            # else if(hosttimes[i+j] >= cultimes[i] & hosttimes[i+j] < cultimes[i] + 5)
-            #   probs <- c(probs, S/(1+a*exp(-r*cultimes[i])) * exp(-C*(hosttimes[i+j]-cultimes[i])))
+            else if(hosttimes[i+j] >= cultimes[i] & hosttimes[i+j] < cultimes[i] + 5)
+              probs <- c(probs, S/(1+a*exp(-r*cultimes[i])) * exp(-C*(hosttimes[i+j]-cultimes[i])))
             else 
               probs <- c(probs, 0)
           }
