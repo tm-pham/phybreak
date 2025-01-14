@@ -47,6 +47,9 @@ add_modules_to_phybreak <- function(le,
 
 # Add data and parameters to phybreak.object
 #' @export
+#' introductions = initial value for number of introductions 
+#' wh.history = initial value for within-host history 1/coalescent rate 
+#' intro.rate = initial value for introduction rate. Interpretation: Number of introductions per time period, e.g. 8/150 is 8 introductions within 150 days
 introductions_parameters <- function(le, introductions = 1, 
     wh.history = 1, intro.rate = 1, reproduction.rate = 1,
     est.intro.rate = TRUE, prior.intro.rate.mean = 1, prior.intro.rate.shape = 1,
