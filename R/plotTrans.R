@@ -111,13 +111,13 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       # tree2plot$infector[tree2plot$infector=="history"] <- "index"
       # tree2plot <- tree2plot[-1,]
       
-      vars <- list(sample.times = x$d$sample.times,
+      vars <- list(sample.times = as.numeric(x$d$sample.times - x$d$reference.date),
                    sample.hosts = x$d$hostnames,
-                   culling.times = x$d$removal.times,
-                   admin.times = x$d$admission.times,
                    sim.infection.times = tree2plot[, 3],
                    sim.infectors = as.character(tree2plot[, 1]),
                    post.support = tree2plot[, 2])
+      if (!is.null(x$d$culling.times)) vars[['culling.times']] <- as.numeric(x$d$culling.times - x$d$reference.date)
+      if (!is.null(x$d$adtimes)) vars[['admin.times']] <- as.numeric(x$d$adtimes - x$d$reference.date)
       names(vars$sample.times) <- x$d$hostnames
       names(vars$sim.infection.times) <- x$d$hostnames[1:x$p$obs]
       names(vars$sim.infectors) <- x$d$hostnames[1:x$p$obs]
@@ -131,7 +131,8 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
                      trans.sample = median(x$s$tS),
                      trans.init = x$p$trans.init,
                      trans.culling = x$p$trans.culling,
-                     trans.growth = median(x$s$tG))
+                     trans.growth = median(x$s$tG),
+                     inf_function = x$p$inf_function)
     } else if (samplenr == 0) {
       vars <- phybreak2trans(x$v, x$d$hostnames, x$d$reference.date,
                              x$d$removal.times)
@@ -149,7 +150,8 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
                      trans.sample = trans.sample,
                      trans.init = x$p$trans.init,
                      trans.culling = x$p$trans.culling,
-                     trans.growth = trans.growth)
+                     trans.growth = trans.growth,
+                     inf_function = x$p$inf_function)
     } else {
       # plot.which == "sample" && samplenr > 0
       
@@ -177,7 +179,8 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
                      trans.sample = x$s$tS[samplenr],
                      trans.init = x$p$trans.init,
                      trans.culling = x$p$trans.culling,
-                     trans.growth = x$s$tG[samplenr])
+                     trans.growth = x$s$tG[samplenr],
+                     inf_function = x$p$inf_function)
     }
   }
   
@@ -299,6 +302,7 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
     x0s <- seq(inftimes[i], tmax - tstep, tstep)
     #widths <- abs(1 - (maxwd - dgamma(x0s - inftimes[i], shape = tgshape, scale = tgscale)) / maxwd)
     if(p$trans.model == "user"){
+      print(p)
       widths <- sapply(x0s, function(x){
         ifelse(x <= cultimes[i], infect_distribution(x, inftimes[i],
                                                      le = list(p = p, v = list(nodetimes = samtimes)),

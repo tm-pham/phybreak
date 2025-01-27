@@ -38,7 +38,7 @@ infect_distribution <- function(time, inftimes, le,
       prob <- le$p$inf_function(time, inftimes, le,
                                  nodetimes, host, log)
     }
-    
+    return(prob)
 
   ### User-defined generation distribution ###
   } else if(trans.model =="user") {
