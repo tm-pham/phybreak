@@ -882,6 +882,17 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
             else 
               probs <- c(probs, 0)
           }
+        } else {
+          if(hosttimes < 0)
+              probs <- 0
+            else if(hosttimes < samtimes[host])
+              probs <- 1/(1+a*exp(-r*hosttimes))
+            else if(hosttimes >= samtimes[host] & hosttimes < cultimes)
+              probs <- S/(1+a*exp(-r*hosttimes))
+            else if(hosttimes >= cultimes[host] & hosttimes < cultimes + 5)
+              probs <- S/(1+a*exp(-r*cultimes)) * exp(-C*(hosttimes-cultimes))
+            else 
+              probs <- 0
         }
       }
       

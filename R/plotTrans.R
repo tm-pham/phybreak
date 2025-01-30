@@ -116,7 +116,7 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
                    sim.infection.times = tree2plot[, 3],
                    sim.infectors = as.character(tree2plot[, 1]),
                    post.support = tree2plot[, 2])
-      if (!is.null(x$d$culling.times)) vars[['culling.times']] <- as.numeric(x$d$culling.times - x$d$reference.date)
+      if (!is.null(x$d$removal.times)) vars[['culling.times']] <- as.numeric(x$d$removal - x$d$reference.date)
       if (!is.null(x$d$adtimes)) vars[['admin.times']] <- as.numeric(x$d$adtimes - x$d$reference.date)
       names(vars$sample.times) <- x$d$hostnames
       names(vars$sim.infection.times) <- x$d$hostnames[1:x$p$obs]
@@ -128,10 +128,10 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       tg.mean <- median(x$s$mG)
       tg.shape = x$p$gen.shape
       ttrans <- list(trans.model = trans.model,
-                     trans.sample = median(x$s$tS),
+                     trans.sample = x$p$trans.sample,
                      trans.init = x$p$trans.init,
-                     trans.culling = x$p$trans.culling,
-                     trans.growth = median(x$s$tG),
+                     trans.growth = x$p$trans.growth,
+                     trans.removal = x$p$trans.removal,
                      inf_function = x$p$inf_function)
     } else if (samplenr == 0) {
       vars <- phybreak2trans(x$v, x$d$hostnames, x$d$reference.date,
@@ -302,13 +302,16 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
     x0s <- seq(inftimes[i], tmax - tstep, tstep)
     #widths <- abs(1 - (maxwd - dgamma(x0s - inftimes[i], shape = tgshape, scale = tgscale)) / maxwd)
     if(p$trans.model == "user"){
-      print(p)
       widths <- sapply(x0s, function(x){
         ifelse(x <= cultimes[i], infect_distribution(x, inftimes[i],
-                                                     le = list(p = p, v = list(nodetimes = samtimes)),
-                                                     nodetimes = samtimes), 0)
+                                                     le = list(p = p, 
+                                                               v = list(nodetimes = samtimes, inftimes = inftimes), 
+                                                               d = list(removal.times = cultimes)),
+                                                     nodetimes = samtimes, host = i, log = FALSE), 0)
       })
-      widths <- abs(1 - (maxwd - widths)/maxwd)
+      print(widths)
+      widths <- widths/max(widths)
+      print(widths)
     } else if (!is.null(cultimes)) {
       widths <- sapply(x0s, function(x){
         #if (x0s < adtimes[i]) return(0)
