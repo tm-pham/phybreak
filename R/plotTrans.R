@@ -147,10 +147,10 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       trans.sample = x$p$trans.sample
       trans.growth = x$p$trans.growth
       ttrans <- list(trans.model = trans.model,
-                     trans.sample = trans.sample,
+                     trans.sample = x$p$trans.sample,
                      trans.init = x$p$trans.init,
-                     trans.culling = x$p$trans.culling,
-                     trans.growth = trans.growth,
+                     trans.growth = x$p$trans.growth,
+                     trans.removal = x$p$trans.removal,
                      inf_function = x$p$inf_function)
     } else {
       # plot.which == "sample" && samplenr > 0
@@ -176,10 +176,10 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       tg.mean <- x$s$mG[samplenr]
       tg.shape = x$p$gen.shape
       ttrans <- list(trans.model = trans.model,
-                     trans.sample = x$s$tS[samplenr],
+                     trans.sample = x$p$trans.sample,
                      trans.init = x$p$trans.init,
-                     trans.culling = x$p$trans.culling,
-                     trans.growth = x$s$tG[samplenr],
+                     trans.growth = x$p$trans.growth,
+                     trans.removal = x$p$trans.removal,
                      inf_function = x$p$inf_function)
     }
   }
@@ -309,9 +309,7 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
                                                                d = list(removal.times = cultimes)),
                                                      nodetimes = samtimes, host = i, log = FALSE), 0)
       })
-      print(widths)
       widths <- widths/max(widths)
-      print(widths)
     } else if (!is.null(cultimes)) {
       widths <- sapply(x0s, function(x){
         #if (x0s < adtimes[i]) return(0)
