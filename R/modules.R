@@ -802,7 +802,7 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     le$sampleslot <- c(le$sampleslot, userenv$sampleslot)
     
     # Infectivity function
-    le$parameterslot[["inf_function"]] <- infect_function <- function(time, inftimes, le, nodetimes, 
+    le$parameterslot[["inf_function"]] <- function(time, inftimes, le, nodetimes, 
                                                                       host, log = FALSE,
                                                                       test.arguments = FALSE){
       
@@ -814,13 +814,13 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
         stop("removal times of hosts must be provided")
       } else {
         removal.times <- d$removal.times
-        if(class(removal.times[1]) == "Date"){
-          removal.times <- as.numeric(removal.times - d$reference.date)
-        }
+        # if(inherits(removal.times, "Date")){
+        #   removal.times <- as.numeric(removal.times - d$reference.date)
+        # }
       }
       
       if(test.arguments) return()
-      
+
       if(is.null(p$trans.init))
         stop("initial fraction infected is missing")
       if(is.null(p$trans.growth))
@@ -837,8 +837,8 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
       
       # Calculate normalization factor by calculating mean AUC of infectiousness function
       AUCs <- unlist(lapply(1:length(v$inftimes), function(i){
-        samtime = v$nodetimes[i] - v$inftimes[i]
-        cultime = removal.times[i] - v$inftimes[i]
+        samtime = as.numeric(v$nodetimes[i] - v$inftimes[i])
+        cultime = as.numeric(removal.times[i] - v$inftimes[i])
         if (r*samtime < 100){
           probs = sum((log(a+exp(r*samtime)) - log(a+1)) / r,
                       S * ( log(a+exp(r*cultime)) - log(a+exp(r*samtime)) ) / r,
