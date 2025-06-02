@@ -23,7 +23,7 @@ Imports:
     stats,
     stringr,
     utils,
-    sp
+    sp,
     truncdist
 Suggests:
     phytools,
