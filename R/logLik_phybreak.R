@@ -48,7 +48,7 @@ logLik.phybreak <- function(object, genetic = TRUE, withinhost = TRUE, sampling 
     res <- res + with(object, lik_gentimes(list(p = p, v = v)))
   }
   if (sampling) {
-    res <- res + with(object, lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes))
+    res <- res + with(object, lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes, d$last_negative))
   }
   if (withinhost) {
     objectenv <- object
@@ -97,8 +97,32 @@ lik_gentimes <- function(le){
 }
 
 ### calculate the log-likelihood of sampling intervals 
-lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes) {
-  sum(dgamma(nodetimes[1:obs] - inftimes, shape = shapeS, scale = meanS/shapeS, log = TRUE))
+lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes, last_negative = NULL) {
+  loglik <- numeric(obs)
+  for (i in 1:obs) {
+    if (!is.null(last_negative) && !is.na(last_negative[i])) {
+      interval <- nodetimes[i] - inftimes[i]
+      min_interval <- nodetimes[i] - last_negative[i]
+      if (inftimes[i] < last_negative[i] || interval < 0) {
+        loglik[i] <- -Inf
+      } else {
+        if (!requireNamespace("truncdist", quietly = TRUE)) {
+          stop("Please install the 'truncdist' package.")
+        }
+        loglik[i] <- truncdist::dtruncgamma(
+          interval,
+          a = min_interval,
+          b = Inf,
+          shape = shapeS,
+          scale = meanS / shapeS,
+          log = TRUE
+        )
+      }
+    } else {
+      loglik[i] <- dgamma(nodetimes[i] - inftimes[i], shape = shapeS, scale = meanS / shapeS, log = TRUE)
+    }
+  }
+  sum(loglik)
 }
 
 ### calculate the log-likelihood of distances 

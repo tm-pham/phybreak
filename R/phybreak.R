@@ -164,6 +164,7 @@ phybreak <- function(dataset, times = NULL,
   dataslot$hostnames <- dataset$sample.hosts
   dataslot$sequences <- dataset$sequences
   dataslot$sample.times <- dataset$sample.times
+  dataslot$last_negative <- dataset$last_negative
 
   #SNP count
   SNPpatterns <- do.call(rbind, dataslot$sequences)

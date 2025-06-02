@@ -130,7 +130,7 @@ build_pbe <- function(phybreak.obj) {
 
 
   ### calculate the other log-likelihoods
-  logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes)
+  logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes, d$last_negative)
   logLikgen <- lik_gentimes(le)
   logLikcoal <- lik_coaltimes(le)
 
@@ -251,7 +251,7 @@ propose_pbe <- function(f) {
   }
   
   if (f == "phylotrans" || f == "trans" || f == "mS") {
-    logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes)
+    logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes, d$last_negative)
     copy2pbe1("logLiksam", le)
   }
   
