@@ -630,6 +630,7 @@ update_host_history <- function(hostID, which_protocol) {
         (sum(sapply(logLiks, function(n) return(pbe1[[n]]))) + pbe1$logLiktoporatio -
         sum(sapply(logLiks, function(n) return(pbe0[[n]])))) + pbe1$logproposalratio
       
+      cat("logacceptanceprob: ", logacceptanceprob, "\n")
       if (runif(1) < exp(logacceptanceprob)) {
         accept_pbe("phylotrans")
       }
