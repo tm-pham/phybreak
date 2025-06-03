@@ -110,8 +110,9 @@ lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes, last_negati
         if (!requireNamespace("truncdist", quietly = TRUE)) {
           stop("Please install the 'truncdist' package.")
         }
-        loglik[i] <- truncdist::dtruncgamma(
+        loglik[i] <- truncdist::dtrunc(
           interval,
+          spec = "gamma", 
           a = min_interval,
           b = Inf,
           shape = shapeS,
