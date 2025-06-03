@@ -114,12 +114,11 @@ lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes, last_negati
         scale = meanS / shapeS,
         log = TRUE
       )
+    }else {
+      loglik[i] <- dgamma(nodetimes[i] - inftimes[i], shape = shapeS, scale = meanS / shapeS, log = TRUE)
     }
-  } else {
-    loglik[i] <- dgamma(nodetimes[i] - inftimes[i], shape = shapeS, scale = meanS / shapeS, log = TRUE)
   }
-}
-sum(loglik)
+  sum(loglik)
 }
 
 ### calculate the log-likelihood of distances 
