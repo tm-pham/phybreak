@@ -46,7 +46,7 @@
 #' dataset <- phybreakdata(sequences = sampleSNPdata, sample.times = sampletimedata)
 #' @export
 phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL,
-                         removal.times = NULL, sample.names = NULL, host.names = sample.names, 
+                         removal.times = NULL, last_negative = NULL, sample.names = NULL, host.names = sample.names, 
                          sim.infection.times = NULL, sim.infectors = NULL, sim.tree = NULL) {
   
   ##########################################################
@@ -69,6 +69,10 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL
   }
   if(!is.null(removal.times))
     if(!inherits(removal.times, c("Date", "numeric", "integer"))) {
+      stop("removal.times shoud be numeric or of class \"Date")
+    }
+  if(!is.null(last_negative))
+    if(!inherits(last_negative, c("Date", "numeric", "integer"))) {
       stop("removal.times shoud be numeric or of class \"Date")
     }
   if(nrow(sequences) != length(sample.times)) {
@@ -252,6 +256,26 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL
       names(removal.times) <- orderedhosts
     }
     res <- c(res, list(removal.times = removal.times))
+  }
+  
+  ### last negative test data ###
+  
+  if(!is.null(last_negative)){
+    if(class(last_negative) != class(sample.times)) {
+      stop("last_negative should be of same class as sample.times")
+    }
+    last_negative <- last_negative[allfirsttimes][outputorderhosts]
+    
+    if(is.null(names(last_negative))) {
+      names(last_negative) <- orderedhosts
+    } else if (all(names(last_negative) %in% orderedhosts)) {
+      last_negative <- last_negative[orderedhosts]
+    } else {
+      warning("names in last_negative don't match host.names and are therefore overwritten")
+      last_negative <- last_negative[outputorderhosts]
+      names(last_negative) <- orderedhosts
+    }
+    res <- c(res, list(last_negative = last_negative))
   }
   
   ### Conctact data ###

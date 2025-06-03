@@ -29,11 +29,20 @@ update_host_keepphylo <- function(hostID) {
   le <- environment()
   p <- pbe1$p
   v <- pbe1$v
+  d <- pbe1$d
   
   ### propose the new infection time
   tinf.prop <- v$nodetimes[hostID] - 
     rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
   copy2pbe1("tinf.prop", le)
+  
+  ### check if the proposed infection time is before the last negative test
+  if (!is.null(d$last_negative) && !is.na(d$last_negative[hostID])) {
+    if (tinf.prop <= d$last_negative[hostID]) {
+      # The proposed infection time is before the last negative test, so reject proposal.
+      return(invisible(NULL))
+    }
+  }
   
   ### identify the focal host's infector
   hostiorID <- v$infectors[hostID]

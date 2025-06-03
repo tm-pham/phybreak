@@ -182,12 +182,11 @@ phybreak <- function(dataset, times = NULL,
 
   #Reference date
   reference_date <- min(dataset$sample.times)
+  #copy2userenv("reference_date", environment())
   
   # Convert last negative sampling times to numeric wrt reference date
   dataset$last_negative <- as.numeric(dataset$last_negative - reference_date)
   dataslot$last_negative <- dataset$last_negative
-  
-  #copy2userenv("reference_date", environment())
   
   ##############################
   ### third slot: parameters ###
