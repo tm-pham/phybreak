@@ -102,8 +102,6 @@ lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes, last_negati
   for (i in 1:obs) {
     if (!is.null(last_negative) && !is.na(last_negative[i])){
       interval <- nodetimes[i] - inftimes[i]
-      cat("Nodetime[", i, "]:", nodetimes[i], "last_negative[", i, "]:", last_negative[i], "inftimes[", i, "]:", 
-          inftimes[i],"\n")
       min_interval <- as.numeric(nodetimes[i]) - as.numeric(last_negative[i])
       loglik[i] <- truncdist::dtrunc(
         interval,
