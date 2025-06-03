@@ -158,6 +158,14 @@ update_host_phylotrans <- function(hostID, which_protocol) {
   # tinf.prop <- min(tinf.prop, 2 * v$nodetimes[hostID] - tinf.prop)
   if (!is.null(d$admission.times))
     if (tinf.prop < d$admission.times[hostID]) return()
+  
+  ### check if the proposed infection time is after the last negative test (otherwise reject)
+  if (!is.null(d$last_negative) && !is.na(d$last_negative[hostID])) {
+    if (tinf.prop <= d$last_negative[hostID]) {
+      # The proposed infection time is before the last negative test, so reject proposal.
+      return(invisible(NULL))
+    }
+  }
   copy2pbe1("tinf.prop", le)
   
   ### going down the decision tree
@@ -217,6 +225,13 @@ update_host_history <- function(hostID, which_protocol) {
   tinf.prop <- v$nodetimes[hostID] -
     rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
   
+  ### check if the proposed infection time is after the last negative test (otherwise reject)
+  if (!is.null(d$last_negative) && !is.na(d$last_negative[hostID])) {
+    if (tinf.prop <= d$last_negative[hostID]) {
+      # The proposed infection time is before the last negative test, so reject proposal.
+      return(invisible(NULL))
+    }
+  }
   #if (!is.null(d$admission.times) & hostID != 0)
   #  if (tinf.prop < d$admission.times[hostID]) return()
   copy2pbe1("tinf.prop", le)
