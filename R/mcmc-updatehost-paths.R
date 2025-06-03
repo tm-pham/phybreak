@@ -36,7 +36,7 @@ update_host_keepphylo <- function(hostID) {
     rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
   copy2pbe1("tinf.prop", le)
   
-  ### check if the proposed infection time is before the last negative test
+  ### check if the proposed infection time is after the last negative test (otherwise reject)
   if (!is.null(d$last_negative) && !is.na(d$last_negative[hostID])) {
     if (tinf.prop <= d$last_negative[hostID]) {
       # The proposed infection time is before the last negative test, so reject proposal.
@@ -71,6 +71,16 @@ update_host_keepphylo <- function(hostID) {
       tinf2.prop <- v$nodetimes[hostiorID] - 
         rgamma(1, shape = tinf.prop.shape.mult * p$sample.shape, scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape))
       copy2pbe1("tinf2.prop", le)
+      
+      # check if the proposed infection time is after the last negative test (otherwise reject)
+      if (!is.null(d$last_negative) && !is.na(d$last_negative[hostiorID])) {
+        if (tinf2.prop <= d$last_negative[hostiorID]) {
+          # Proposed infection time for infector is before their last negative test: reject proposal
+          return(invisible(NULL))
+        }
+      }
+      
+      
       if (tinf2.prop > timemrca) {
         # NNY (... & tinf2.prop after MRCA of hostID and hostiorID)
         hostioriorID <- v$infectors[hostiorID]
