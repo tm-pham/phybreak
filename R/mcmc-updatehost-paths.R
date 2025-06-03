@@ -226,6 +226,9 @@ update_host_history <- function(hostID, which_protocol) {
     rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
   
   ### check if the proposed infection time is after the last negative test (otherwise reject)
+  # Print last_negative
+  cat("hostID =", hostID, "\n")
+  cat("Last negative test times :", d$last_negative, "\n")
   if (!is.null(d$last_negative) && !is.na(d$last_negative[hostID])) {
     if (tinf.prop <= d$last_negative[hostID]) {
       # The proposed infection time is before the last negative test, so reject proposal.
