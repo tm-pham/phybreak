@@ -229,7 +229,7 @@ update_host_history <- function(hostID, which_protocol) {
   # Print last_negative
   cat("hostID =", hostID, "\n")
   cat("Last negative test times :", d$last_negative, "\n")
-  if (!is.null(d$last_negative) && !is.na(d$last_negative[hostID])) {
+  if (hostID!=0 && !is.null(d$last_negative) && !is.na(d$last_negative[hostID])) {
     if (tinf.prop <= d$last_negative[hostID]) {
       # The proposed infection time is before the last negative test, so reject proposal.
       return(invisible(NULL))
