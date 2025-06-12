@@ -73,7 +73,7 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL
     }
   if(!is.null(last_negative))
     if(!inherits(last_negative, c("Date", "numeric", "integer"))) {
-      stop("removal.times shoud be numeric or of class \"Date")
+      stop("last_negative times shoud be numeric or of class \"Date")
     }
   if(nrow(sequences) != length(sample.times)) {
     stop("numbers of sequences and sample.times don't match")

@@ -97,27 +97,10 @@ lik_gentimes <- function(le){
 }
 
 ### calculate the log-likelihood of sampling intervals 
-lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes, last_negative = NULL) {
-  loglik <- numeric(obs)
-  for (i in 1:obs) {
-    if (!is.null(last_negative) && !is.na(last_negative[i])){
-      interval <- nodetimes[i] - inftimes[i]
-      min_interval <- as.numeric(nodetimes[i]) - as.numeric(last_negative[i])
-      loglik[i] <- truncdist::dtrunc(
-        interval,
-        spec = "gamma", 
-        a = min_interval,
-        b = Inf,
-        shape = shapeS,
-        scale = meanS / shapeS,
-        log = TRUE
-      )
-    }else {
-      loglik[i] <- dgamma(nodetimes[i] - inftimes[i], shape = shapeS, scale = meanS / shapeS, log = TRUE)
-    }
-  }
-  sum(loglik)
+lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes) {
+  sum(dgamma(nodetimes[1:obs] - inftimes, shape = shapeS, scale = meanS/shapeS, log = TRUE))
 }
+
 
 ### calculate the log-likelihood of distances 
 # lik_distances <- function(dist.model, dist.exponent, dist.scale, dist.mean, infectors, distances, area) {
