@@ -39,7 +39,7 @@ infect_distribution <- function(time, inftimes, le,
       prob <- inf_func(time, inftimes, le,
                        nodetimes, host, log)
     }
-    return(prob)
+    
 
   ### User-defined generation distribution ###
   } else if(trans.model =="user") {
@@ -61,6 +61,7 @@ infect_distribution <- function(time, inftimes, le,
   #       })
   #       return(prob * prob.cnt)
   #     }
+  # 
   #     # If calculating proposed ID
   #     if (log) return(prob + pbe0$contactarray[pbe1$hostID,,1])
   #     else return(prob * pbe0$contactarray[pbe1$hostID,,1])
