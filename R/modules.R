@@ -668,7 +668,7 @@ infectivity_parameters <- function(le, admission.times = NULL, removal.times = N
     
     # If removal times are present, use adjusted Gamma distribution
     # Dataslot
-    if (is.null(removal.times)) {
+    if (is.null(removal.times)){
       if (!is.null(le$dataset$removal.times)) {
         removal.times = le$dataset$removal.times
       }

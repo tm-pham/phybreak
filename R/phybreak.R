@@ -250,6 +250,8 @@ phybreak <- function(dataset, times = NULL,
   add_modules_to_phybreak(le, ...)
   dataslot <- le$dataslot
   if (!is.null(dataslot$removal.times)) dataset$removal.times <- dataslot$removal.times
+  if (!is.null(dataslot$admission.times)) dataset$admission.times <- dataslot$admission.times
+  if (!is.null(dataslot$last.negative)) dataset$last.negative <- dataslot$last.negative
   
   parameterslot <- le$parameterslot
   helperslot <- le$helperslot

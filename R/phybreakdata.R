@@ -46,7 +46,7 @@
 #' dataset <- phybreakdata(sequences = sampleSNPdata, sample.times = sampletimedata)
 #' @export
 phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL,
-                         removal.times = NULL, sample.names = NULL, host.names = sample.names, 
+                         removal.times = NULL, admission.times = NULL, last.negative = NULL, sample.names = NULL, host.names = sample.names, 
                          sim.infection.times = NULL, sim.infectors = NULL, sim.tree = NULL) {
   
   ##########################################################
@@ -70,6 +70,14 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL
   if(!is.null(removal.times))
     if(!inherits(removal.times, c("Date", "numeric", "integer"))) {
       stop("removal.times shoud be numeric or of class \"Date")
+    }
+  if(!is.null(admission.times))
+    if(!inherits(admission.times, c("Date", "numeric", "integer"))) {
+      stop("admission.times shoud be numeric or of class \"Date")
+    }
+  if(!is.null(last.negative))
+    if(!inherits(last.negative, c("Date", "numeric", "integer"))) {
+      stop("last_negative times shoud be numeric or of class \"Date")
     }
   if(nrow(sequences) != length(sample.times)) {
     stop("numbers of sequences and sample.times don't match")
@@ -252,6 +260,44 @@ phybreakdata <- function(sequences, sample.times, spatial = NULL, contact = NULL
       names(removal.times) <- orderedhosts
     }
     res <- c(res, list(removal.times = removal.times))
+  }
+  
+  ### last negative test data ###
+  if(!is.null(last.negative)){
+    if(class(last.negative) != class(sample.times)) {
+      stop("last.negative should be of same class as sample.times")
+    }
+    last.negative <- last.negative[allfirsttimes][outputorderhosts]
+    
+    if(is.null(names(last.negative))) {
+      names(last.negative) <- orderedhosts
+    } else if (all(names(last.negative) %in% orderedhosts)) {
+      last.negative <- last.negative[orderedhosts]
+    } else {
+      warning("names in last.negative don't match host.names and are therefore overwritten")
+      last.negative <- last.negative[outputorderhosts]
+      names(last.negative) <- orderedhosts
+    }
+    res <- c(res, list(last.negative = last.negative))
+  }
+  
+  ### admission times ###
+  if(!is.null(admission.times)){
+    if(class(admission.times) != class(sample.times)) {
+      stop("admission.times should be of same class as sample.times")
+    }
+    admission.times <- admission.times[allfirsttimes][outputorderhosts]
+    
+    if(is.null(names(admission.times))) {
+      names(admission.times) <- orderedhosts
+    } else if (all(names(admission.times) %in% orderedhosts)) {
+      admission.times <- admission.times[orderedhosts]
+    } else {
+      warning("names in admission.times don't match host.names and are therefore overwritten")
+      admission.times <- admission.times[outputorderhosts]
+      names(admission.times) <- orderedhosts
+    }
+    res <- c(res, list(admission.times = admission.times))
   }
   
   ### Conctact data ###
