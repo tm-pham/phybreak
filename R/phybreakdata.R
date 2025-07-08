@@ -19,6 +19,8 @@
 #'  length as \code{sample.times}. 
 #' @param removal.times A vector with removal dates. The vector identifies the removal date for each sample, so should be of
 #'  of the same length as \code{sample.times}.
+#'  @param last.negative A vector with last negative test dates. The vector identifies the last negative test date for each sample, so should be of
+#'  of the same length as \code{sample.times}.
 #' @param sim.infection.times A vector with infection times (\code{numerical} or \code{Date}).
 #' @param sim.infectors A vector with infectors, either by name or by position (use 0 for the index case).
 #' @param sim.tree A tree of class \code{'phylo'}, with tip names identifying the hosts.

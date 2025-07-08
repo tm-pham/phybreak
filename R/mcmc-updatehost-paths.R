@@ -29,11 +29,17 @@ update_host_keepphylo <- function(hostID) {
   le <- environment()
   p <- pbe1$p
   v <- pbe1$v
+  d <- pbe1$d
   
   ### propose the new infection time
   tinf.prop <- v$nodetimes[hostID] - 
     rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
   copy2pbe1("tinf.prop", le)
+  
+  ### If we have a last-negative date and the proposal is before that date then never accept this proposal 
+  if(!is.null(last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
+    return()
+  }
   
   ### identify the focal host's infector
   hostiorID <- v$infectors[hostID]
@@ -139,6 +145,10 @@ update_host_phylotrans <- function(hostID, which_protocol) {
   # tinf.prop <- min(tinf.prop, 2 * v$nodetimes[hostID] - tinf.prop)
   if (!is.null(d$admission.times))
     if (tinf.prop < d$admission.times[hostID]) return()
+  ### If we have a last-negative date and the proposal is before that date then never accept this proposal 
+  if(!is.null(last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
+    return()
+  }
   copy2pbe1("tinf.prop", le)
   
   ### going down the decision tree
@@ -200,6 +210,11 @@ update_host_history <- function(hostID, which_protocol) {
   
   #if (!is.null(d$admission.times) & hostID != 0)
   #  if (tinf.prop < d$admission.times[hostID]) return()
+  
+  ### If we have a last-negative date and the proposal is before that date then never accept this proposal 
+  if(!is.null(last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
+    return()
+  }
   copy2pbe1("tinf.prop", le)
   
   ### going down the decision tree
