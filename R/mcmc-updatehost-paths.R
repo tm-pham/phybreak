@@ -37,7 +37,7 @@ update_host_keepphylo <- function(hostID) {
   copy2pbe1("tinf.prop", le)
   
   ### If we have a last-negative date and the proposal is before that date then never accept this proposal 
-  if(!is.null(last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
+  if(!is.null(d$last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
     return()
   }
   
@@ -146,7 +146,7 @@ update_host_phylotrans <- function(hostID, which_protocol) {
   if (!is.null(d$admission.times))
     if (tinf.prop < d$admission.times[hostID]) return()
   ### If we have a last-negative date and the proposal is before that date then never accept this proposal 
-  if(!is.null(last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
+  if(!is.null(d$last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
     return()
   }
   copy2pbe1("tinf.prop", le)
@@ -212,7 +212,7 @@ update_host_history <- function(hostID, which_protocol) {
   #  if (tinf.prop < d$admission.times[hostID]) return()
   
   ### If we have a last-negative date and the proposal is before that date then never accept this proposal 
-  if(!is.null(last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
+  if(!is.null(d$last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
     return()
   }
   copy2pbe1("tinf.prop", le)
