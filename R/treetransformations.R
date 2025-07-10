@@ -118,7 +118,7 @@ phybreak2phylo <- function(vars, samplenames = c(), simmap = FALSE) {
 }
 
 phybreak2trans <- function(vars, hostnames = c(), reference.date = 0,
-                           culling.times = NULL) {
+                           culling.times = NULL, last.negative = NULL) {
   ### extract variables
   nodetimes <- vars$nodetimes
   nodehosts <- vars$nodehosts
@@ -146,6 +146,7 @@ phybreak2trans <- function(vars, hostnames = c(), reference.date = 0,
   return(list(
     sample.times = samtimes,
     culling.times = culling.times,
+    last.negative = last.negative,
     sim.infection.times = inftimes,
     sim.infectors = infectors
   ))
@@ -157,6 +158,11 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
 
   ### extract and order samples
   refdate <- min(vars$sample.times)
+
+  if(!is.null(vars$last.negative)){
+    lastnegtimes <- vars$last.negative - refdate
+  }
+
   samtimes <- vars$sample.times - refdate
   nsamples <- length(samtimes)
   if(exists("sample.hosts", vars)) {
@@ -200,7 +206,7 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
   ### infection times and infectors
   if(is.null(vars$sim.infection.times) | is.null(vars$sim.infectors) | resample) {
     resample <- TRUE
-    inftimes <- .rinftimes(samtimes[1:nhosts], resamplepars$sample.mean, resamplepars$sample.shape)
+    inftimes <- .rinftimes(samtimes[1:nhosts], resamplepars$sample.mean, resamplepars$sample.shape, lastneg = lastnegtimes[1:nhosts])
     infectors <- .rinfectors(inftimes, introductions, d = c(vars, reference.date = refdate), p = resamplepars, 
                                v = list(nodetimes = samtimes))
   } else {
@@ -374,7 +380,7 @@ whichgeneration <- function(infectors, hostID) {
 
 
 ### random infection times given sampling times and sampling interval distribution
-.rinftimes <- function(st, meanS, shapeS) {
+.rinftimes <- function(st, meanS, shapeS, lastneg = NULL) {
   ### tests
   if(class(st) != "numeric" && class(st) != "integer") {
     stop(".rinftimes called with non-numeric sampling times")
@@ -383,7 +389,20 @@ whichgeneration <- function(infectors, hostID) {
   if(shapeS <= 0) stop(".rinftimes called with non-positive shape parameter")
   
   ### function body
-  st - rgamma(length(st), shape = shapeS, scale = meanS/shapeS)
+  tinf.prop <- rep(NA, length(st))
+  if(!is.null(lastneg)) {
+    for(i in 1:length(st)){
+      M_i <- as.numeric(st[i]-lastneg[i])
+      repeat{
+        D_prop <- rgamma(1, shape = shapeS, scale = meanS/shapeS)
+        if (is.na(M_i) || D_prop <= M_i) break
+      }
+      tinf.prop[i] <- st[i] - D_prop
+    }
+  }else{
+    tinf.prop <- st - rgamma(length(st), shape = shapeS, scale = meanS/shapeS)
+  }
+  return(tinf.prop)
 }
 
 ### random infectors given infection times and generation interval distribution

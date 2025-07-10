@@ -134,7 +134,7 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
                      trans.growth = median(x$s$tG))
     } else if (samplenr == 0) {
       vars <- phybreak2trans(x$v, x$d$hostnames, x$d$reference.date,
-                             x$d$removal.times)
+                             x$d$removal.times, x$d$last.negative)
       if(is.null(arrow.col)) {
         arrow.col <- "black"
       } else {
@@ -165,7 +165,7 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       # vars <- remove_history(x)
       
       vars <- phybreak2trans(vars, unique(x$d$hostnames), x$d$reference.date,
-                             x$d$removal.times)
+                             x$d$removal.times, x$d$last.negative)
       if(is.null(arrow.col)) {
         arrow.col <- "black"
       } else {

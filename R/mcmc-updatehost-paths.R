@@ -31,12 +31,40 @@ update_host_keepphylo <- function(hostID) {
   v <- pbe1$v
   d <- pbe1$d
   
-  ### propose the new infection time
-  tinf.prop <- v$nodetimes[hostID] - 
-    rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
+  ### Propose a new infection time
+  reference.date <- d$reference.date
+  if(!is.null(d$last.negative)){
+    last.negative.times <- d$last.negative
+    if(inherits(last.negative.times, "Date")) {
+      last.negative.times <- as.numeric(last.negative.times - reference.date)
+    }
+    # compute the maximum interval M_i in DAYS
+    M_i <- as.numeric(v$nodetimes[hostID]-last.negative.times[hostID])
+    # draw D ~ Gamma(shape,scale) but only accept if D <= M_i
+    repeat {
+      D_prop <- rgamma(1,
+                       shape = tinf.prop.shape.mult * p$sample.shape,
+                       scale = p$sample.mean /
+                         (tinf.prop.shape.mult * p$sample.shape))
+      if (is.na(M_i) || D_prop <= M_i) break
+    }
+    # now set tinf.prop so that the sampling interval is exactly D_prop
+    tinf.prop <- v$nodetimes[hostID] - D_prop
+  }else{
+    tinf.prop <- v$nodetimes[hostID] -
+      rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
+  }
+  
+  # ### propose the new infection time
+  # tinf.prop <- v$nodetimes[hostID] - 
+  #   rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
   copy2pbe1("tinf.prop", le)
   
   ### If we have a last-negative date and the proposal is before that date then never accept this proposal 
+  if(is.null(d$last.negative)){
+    print("Last negative dates not provided!")
+  }
+  
   if(!is.null(d$last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
     return()
   }
@@ -120,10 +148,13 @@ update_host_withinhost <- function(hostID) {
   ### calculate acceptance probability
   logaccprob <- pbe1$logLikseq - pbe0$logLikseq + logproposalratio
   
-  ### accept or reject
-  if (runif(1) < exp(logaccprob)) {
-    accept_pbe("withinhost")
+  if(is.finite(logaccprob)){
+    ### accept or reject
+    if (runif(1) < exp(logaccprob)) {
+      accept_pbe("withinhost")
+    }
   }
+
 }
 
 
@@ -138,16 +169,35 @@ update_host_phylotrans <- function(hostID, which_protocol) {
   p <- pbe0$p
   v <- pbe0$v
   
-  ### propose the new infection time
-  tinf.prop <- v$nodetimes[hostID] -
-    rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
+  # ### propose the new infection time
+  # tinf.prop <- v$nodetimes[hostID] -
+  #   rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
   # tinf.prop <- v$inftimes[hostID] + rnorm(1, 0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape))
   # tinf.prop <- min(tinf.prop, 2 * v$nodetimes[hostID] - tinf.prop)
-  if (!is.null(d$admission.times))
-    if (tinf.prop < d$admission.times[hostID]) return()
+  # if (!is.null(d$admission.times))
+  #   if (tinf.prop < d$admission.times[hostID]) return()
   ### If we have a last-negative date and the proposal is before that date then never accept this proposal 
-  if(!is.null(d$last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
-    return()
+  reference.date <- d$reference.date
+  if(!is.null(d$last.negative)){
+    last.negative.times <- d$last.negative
+    if(inherits(last.negative.times, "Date")) {
+      last.negative.times <- as.numeric(last.negative.times - reference.date)
+    }
+    # compute the maximum interval M_i in DAYS
+    M_i <- as.numeric(v$nodetimes[hostID]-last.negative.times[hostID])
+    # draw D ~ Gamma(shape,scale) but only accept if D <= M_i
+    repeat {
+      D_prop <- rgamma(1,
+                       shape = tinf.prop.shape.mult * p$sample.shape,
+                       scale = p$sample.mean /
+                         (tinf.prop.shape.mult * p$sample.shape))
+      if (is.na(M_i) || D_prop <= M_i) break
+    }
+    # now set tinf.prop so that the sampling interval is exactly D_prop
+    tinf.prop <- v$nodetimes[hostID] - D_prop
+  }else{
+    tinf.prop <- v$nodetimes[hostID] -
+      rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
   }
   copy2pbe1("tinf.prop", le)
   
@@ -204,17 +254,37 @@ update_host_history <- function(hostID, which_protocol) {
   p <- pbe0$p
   v <- pbe0$v
   
-  ### propose the new infection time
-  tinf.prop <- v$nodetimes[hostID] -
-    rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
+  # ### propose the new infection time
+  # tinf.prop <- v$nodetimes[hostID] -
+  #   rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
   
   #if (!is.null(d$admission.times) & hostID != 0)
   #  if (tinf.prop < d$admission.times[hostID]) return()
   
-  ### If we have a last-negative date and the proposal is before that date then never accept this proposal 
-  if(!is.null(d$last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
-    return()
+  ### If we have a last-negative date and the proposal is before that date then never accept this proposal
+  reference.date <- d$reference.date
+  if(!is.null(d$last.negative) && hostID !=0){
+    last.negative.times <- d$last.negative
+    if(inherits(last.negative.times, "Date")) {
+      last.negative.times <- as.numeric(last.negative.times - reference.date)
+    }
+    # compute the maximum interval M_i in DAYS
+    M_i <- as.numeric(v$nodetimes[hostID]-last.negative.times[hostID])
+    # draw D ~ Gamma(shape,scale) but only accept if D <= M_i
+    repeat {
+      D_prop <- rgamma(1,
+                       shape = tinf.prop.shape.mult * p$sample.shape,
+                       scale = p$sample.mean /
+                         (tinf.prop.shape.mult * p$sample.shape))
+      if (is.na(M_i) || D_prop <= M_i) break
+    }
+    # now set tinf.prop so that the sampling interval is exactly D_prop
+    tinf.prop <- v$nodetimes[hostID] - D_prop
+  }else{
+    tinf.prop <- v$nodetimes[hostID] -
+      rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
   }
+  
   copy2pbe1("tinf.prop", le)
   
   ### going down the decision tree
@@ -228,6 +298,7 @@ update_host_history <- function(hostID, which_protocol) {
       update_pathL(which_protocol)
     }
   }
+
 }
 
 {
@@ -545,9 +616,11 @@ update_host_history <- function(hostID, which_protocol) {
     ### calculate acceptance probability
     logaccprob <- pbe1$logLikseq - pbe0$logLikseq + logproposalratio
     
-    ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("withinhost")
+    if(is.finite(logaccprob)){
+      ### accept or reject
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("withinhost")
+      }
     }
   }
   
@@ -636,9 +709,14 @@ update_host_history <- function(hostID, which_protocol) {
         (sum(sapply(logLiks, function(n) return(pbe1[[n]]))) + pbe1$logLiktoporatio -
         sum(sapply(logLiks, function(n) return(pbe0[[n]])))) + pbe1$logproposalratio
       
-      if (runif(1) < exp(logacceptanceprob)) {
-        accept_pbe("phylotrans")
+      
+      if(is.finite(logacceptanceprob)){
+        # accept or reject
+        if (runif(1) < exp(logacceptanceprob)) {
+          accept_pbe("phylotrans")
+        }
       }
+
     }
     
     if(which_protocol == "edgewise") {
@@ -746,9 +824,11 @@ update_host_history <- function(hostID, which_protocol) {
     logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal + pbe1$logLikdist - 
       pbe0$logLikgen - pbe0$logLiksam - pbe0$logLikcoal - pbe0$logLikdist + logproposalratio
     
-    ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("trans")
+    if(is.finite(logaccprob)){
+      ### accept or reject
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("trans")
+      }
     }
   }
   
@@ -811,6 +891,11 @@ update_host_history <- function(hostID, which_protocol) {
     ### calculate acceptance probability
     logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal - pbe0$logLikgen - pbe0$logLiksam - pbe0$logLikcoal + 
       logproposalratio
+    
+    # Immediately reject any non-finite log-acceptance
+    if (!is.finite(logaccprob)) {
+      return()
+    }
     
     ### accept or reject
     if (runif(1) < exp(logaccprob)) {
@@ -917,9 +1002,11 @@ update_host_history <- function(hostID, which_protocol) {
     logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal - pbe0$logLikgen - pbe0$logLiksam - pbe0$logLikcoal + 
       logproposalratio
     
-    ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("trans")
+    if(is.finite(logaccprob)){
+      ### accept or reject
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("trans")
+      }
     }
   }
   
@@ -1020,11 +1107,13 @@ update_host_history <- function(hostID, which_protocol) {
     ### calculate acceptance probability
     logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal - pbe0$logLikgen - pbe0$logLiksam - pbe0$logLikcoal + 
       logproposalratio
-    
-    ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("trans")
-    }
+
+    if(is.finite(logaccprob)){
+      ### accept or reject
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("trans")
+      }
+    } 
   }
   
   

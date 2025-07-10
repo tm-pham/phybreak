@@ -127,14 +127,14 @@ lik_sampletimes <- function(obs,
   scaleS <- meanS / shapeS
   
   # intervals D_i
-  D <- nodetimes[1:obs] - inftimes[1:obs]
+  D <- as.numeric(difftime(nodetimes[1:obs], inftimes[1:obs]))
   if (any(D <= 0)) {
     return(-Inf)
   }
   
   # compute truncation points M_i if last.neg is provided
   if (!is.null(last.neg)) {
-    M <- nodetimes[1:obs] - last.neg[1:obs]
+    M <- as.numeric(difftime(nodetimes[1:obs], last.neg[1:obs]))
     # any negative M means last.neg > sampletime; treat as NA
     M[M < 0] <- NA
   } else {

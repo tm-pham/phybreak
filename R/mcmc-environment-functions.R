@@ -130,6 +130,9 @@ build_pbe <- function(phybreak.obj) {
 
 
   ### calculate the other log-likelihoods
+  if(inherits(d$last.negative, "Date")) {
+    d$last.negative <- as.numeric(d$last.negative - d$reference.date)
+  }
   logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes, last.neg = d$last.negative)
   logLikgen <- lik_gentimes(le)
   logLikcoal <- lik_coaltimes(le)
@@ -251,6 +254,9 @@ propose_pbe <- function(f) {
   }
   
   if (f == "phylotrans" || f == "trans" || f == "mS") {
+    if(inherits(d$last.negative, "Date")) {
+      d$last.negative <- as.numeric(d$last.negative - d$reference.date)
+    }
     logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes, last.neg = d$last.negative)
     copy2pbe1("logLiksam", le)
   }

@@ -91,7 +91,7 @@ get_transtree <- function(x) {
     stop("object must be of class \"phybreak\"")
   }
   
-  res <- phybreak2trans(x$v, x$d$hostnames, x$d$reference.date)
+  res <- phybreak2trans(x$v, x$d$hostnames, x$d$reference.date, x$d$removal.times, x$d$last.negative)
   res <- with(res, 
               data.frame(infectors = sim.infectors, inf.times = sim.infection.times, row.names = names(sim.infectors)))
   return(res)
