@@ -65,7 +65,7 @@ update_host_keepphylo <- function(hostID) {
     print("Last negative dates not provided!")
   }
   
-  if(!is.null(d$last.negative) && !is.na(d$last.negative[hostID]) %% tinf.prop < d$last.negative[hostID]){
+  if(!is.null(d$last.negative) && !is.na(d$last.negative[hostID]) && tinf.prop < d$last.negative[hostID]){
     return()
   }
   
@@ -96,6 +96,12 @@ update_host_keepphylo <- function(hostID) {
       tinf2.prop <- v$nodetimes[hostiorID] - 
         rgamma(1, shape = tinf.prop.shape.mult * p$sample.shape, scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape))
       copy2pbe1("tinf2.prop", le)
+      
+      # Check last negative constraint for tinf2.prop
+      if(!is.null(d$last.negative) && !is.na(d$last.negative[hostiorID]) && tinf2.prop < d$last.negative[hostiorID]){
+        return()
+      }
+      
       if (tinf2.prop > timemrca) {
         # NNY (... & tinf2.prop after MRCA of hostID and hostiorID)
         hostioriorID <- v$infectors[hostiorID]

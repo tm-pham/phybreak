@@ -166,7 +166,7 @@ phybreak <- function(dataset, times = NULL,
   dataslot$sample.times <- dataset$sample.times
   dataslot$removal.times <- dataset$removal.times
   # dataslot$admission.times <- dataset$admission.times
-  # dataslot$last.negative <- dataset$last.negative
+  dataslot$last.negative <- dataset$last.negative
 
   #SNP count
   SNPpatterns <- do.call(rbind, dataslot$sequences)
