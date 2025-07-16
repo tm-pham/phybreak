@@ -56,17 +56,17 @@
 #' @param cpoint.col Colour of points indicating the transmission contacts, associated with the secondary case,
 #'   both at the tips and roots of the phylogenetic trees. Defaults to same as tree colours.
 #' @param xlab X-axis title.
+#' @param xaxis.breaks Interval for x-axis tick marks and labels. If NULL, R's default axis labeling is used. 
+#'   Can be a numeric value (e.g., 1 for daily, 2 for every 2 days) or "auto" for automatic breaks.
 #' @param axis.cex Size of tick labels.
 #' @param title.cex Size of X-axis title.
 #' @param ... Further graphical parameters (see details).
 #' @section Details: 
 #'   Graphical parameters can be added by using names in the format \code{prefix.parameter} for the
 #'   different parts of the plot. The \code{parameter} will then be passed on to the appropriate 
-#'   graphics function, e.g. \code{tree.lty} to change the line type of the phylogenetic tree. The following 
-#'   prefixes can be used: \code{tree} for the phylogenetic trees, \code{hostlabel} for the host names,
+#'   graphics function, e.g. \code{tree.lty} to change the line type of the phylogenetic tree. The following  #'   prefixes can be used: \code{tree} for the phylogenetic trees, \code{hostlabel} for the host names,
 #'   \code{samplelabel} for the sample names, \code{host} for the host's shading areas, \code{cline} for 
-#'   the vertical contact lines, \code{cpoint} for the transmission contact points, \code{axis} for 
-#'   the X-axis, and \code{title} for the X-axis title.
+#'   the vertical contact lines, \code{cpoint} for the transmission contact points, \code{axis} for the X-axis, and \code{title} for the X-axis title.
 #' @author Don Klinkenberg \email{don@@xs4all.nl}
 #' @references \href{http://dx.doi.org/10.1371/journal.pcbi.1005495}{Klinkenberg et al. (2017)} Simultaneous 
 #'   inference of phylogenetic and transmission trees in infectious disease outbreaks. 
@@ -94,7 +94,7 @@ plotPhyloTrans <- function(x, plot.which = c("sample", "mpc", "mtcc", "mcc"), sa
                            host.col = tree.col, host.alpha = 0.2,
                            cline.lty = 3, cline.lwd = 1, cline.col = "black", 
                            cpoint.pch = 20, cpoint.cex = 1, cpoint.col = tree.col, 
-                           xlab = "Time", axis.cex = 1, title.cex = 1, ...) {
+                           xlab = "Time", xaxis.breaks = NULL, axis.cex = 1, title.cex = 1, ...) {
   ### tests ###
   if(!("phytools" %in% .packages(TRUE))) {
     stop("package 'phytools' should be installed for this function")
@@ -164,6 +164,7 @@ plotPhyloTrans <- function(x, plot.which = c("sample", "mpc", "mtcc", "mcc"), sa
                              hostnames = x$d$hostnames[1:length(x$v$inftimes)],
                              sample.times = x$d$sample.times,
                              reference.date = x$d$reference.date,
+                             last.negative = x$d$last.negative,
                              sequences = x$d$sequences), 
                     v = phybreak2environment(x$v),
                     t = phybreak2phylo(x$v))
@@ -181,7 +182,7 @@ plotPhyloTrans <- function(x, plot.which = c("sample", "mpc", "mtcc", "mcc"), sa
                      host.col = host.col, host.alpha = host.alpha,
                      cline.lty = cline.lty, cline.lwd = cline.lwd, cline.col = cline.col, 
                      cpoint.pch = cpoint.pch, cpoint.cex = cpoint.cex, cpoint.col = cpoint.col, 
-                     xlab = xlab, axis.cex = axis.cex, title.cex = title.cex, ...)
+                     xlab = xlab, xaxis.breaks = xaxis.breaks, axis.cex = axis.cex, title.cex = title.cex, ...)
 }
 
 
@@ -198,7 +199,7 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
                                host.col = tree.col, host.alpha = 0.2,
                                cline.lty = 3, cline.lwd = 1, cline.col = "black", 
                                cpoint.pch = 20, cpoint.cex = 1, cpoint.col = tree.col, 
-                               xlab = "Time", axis.cex = 1, title.cex = 1, ...) {
+                               xlab = "Time", xaxis.breaks = NULL, axis.cex = 1, title.cex = 1, ...) {
   oldmar <- par("mar")
   par(mar = mar)
   on.exit(par(mar = oldmar))
@@ -502,8 +503,14 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
   ###########################################
   
   ### input for phylotrees ###
-  xphylo1 <- completetree$x1vec + plotinput$d$reference.date
-  xphylo2 <- completetree$x2vec + plotinput$d$reference.date
+  # Properly handle Date vs numeric reference dates
+  if(inherits(plotinput$d$reference.date, "Date")) {
+    xphylo1 <- plotinput$d$reference.date + completetree$x1vec
+    xphylo2 <- plotinput$d$reference.date + completetree$x2vec
+  } else {
+    xphylo1 <- completetree$x1vec + plotinput$d$reference.date
+    xphylo2 <- completetree$x2vec + plotinput$d$reference.date
+  }
   yphylo1 <- completetree$y1vec 
   yphylo2 <- completetree$y2vec 
   colphylo <- completetree$hostvec + 1
@@ -515,6 +522,7 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
     unlist(sapply(hosttrees, 
                   function(xx) xx$x1vec[xx$x1vec == min(xx$x1vec) & xx$x1vec >= min(plotinput$v$inftimes)]))
   ) + plotinput$d$reference.date
+
   ynodes <- c(
     completetree$y1vec[completetree$nodevec %in%
                          which(plotinput$v$nodetypes %in% c("t", "b"))],
@@ -531,7 +539,12 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
   ### input for transmission links ###
   if(0 %in% hosts2plot) hosts2plot <- hosts2plot[-which(hosts2plot == 0)]
   links2plot <- hosts2plot[plotinput$v$infectors[hosts2plot] %in% hosts2plot]
-  xtrans <- plotinput$v$inftimes[links2plot] + plotinput$d$reference.date
+  # Apply Date-safe arithmetic
+  if(inherits(plotinput$d$reference.date, "Date")) {
+    xtrans <- plotinput$d$reference.date + plotinput$v$inftimes[links2plot]
+  } else {
+    xtrans <- plotinput$v$inftimes[links2plot] + plotinput$d$reference.date
+  }
   ytrans1 <- sapply(links2plot,
                     function(xx) c(
                       min(ynodes[infecteehosts == xx]))
@@ -542,7 +555,32 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
   ) 
 
   ### input for hosts ###
-  xhost1 <- plotinput$v$inftimes[hosts2plot] + plotinput$d$reference.date
+  # Extend host shaded areas to last-negative-test dates if available
+  # Apply Date-safe arithmetic for infection times
+  xhost1 <- plotinput$d$reference.date + plotinput$v$inftimes[hosts2plot]
+  
+  if(!is.null(plotinput$d$last.negative)) {
+    xlastneg_for_hosts <- plotinput$d$last.negative[hosts2plot]
+    # Convert to same scale for comparison
+    if(inherits(plotinput$d$reference.date, "Date")) {
+      # Both should be Date objects
+      if(!inherits(xlastneg_for_hosts, "Date")) {
+        xlastneg_for_hosts <- plotinput$d$reference.date + xlastneg_for_hosts
+      }
+    } else {
+      # Both should be numeric
+      if(inherits(xlastneg_for_hosts, "Date")) {
+        xlastneg_for_hosts <- as.numeric(xlastneg_for_hosts - plotinput$d$reference.date) + plotinput$d$reference.date
+      } else {
+        xlastneg_for_hosts <- xlastneg_for_hosts + plotinput$d$reference.date
+      }
+    }
+    # Use last-negative-test date if it's earlier than infection time
+    valid_lastneg <- !is.na(xlastneg_for_hosts)
+    xhost1[valid_lastneg] <- pmin(xhost1[valid_lastneg], xlastneg_for_hosts[valid_lastneg])
+  }
+  
+  # Apply Date-safe arithmetic for host end times
   xhost2 <- sapply(hosts2plot, function(xx) max(completetree$x2vec[xx == completetree$hostvec])) + plotinput$d$reference.date
   yhost1 <- sapply(hosts2plot, function(xx) min(completetree$y1vec[xx == completetree$hostvec])) - 0.25
   yhost2 <- sapply(hosts2plot, function(xx) max(completetree$y1vec[xx == completetree$hostvec])) + 0.25
@@ -620,28 +658,75 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
   if(is.null(hostlabel.cex)) hostlabel.cex <- max(0.5, min(1, 30/obs))
   if(is.null(samplelabel.cex)) samplelabel.cex <- 0.8 * hostlabel.cex
   if(is.null(mutationlabel.cex)) mutationlabel.cex <- 0.8 * hostlabel.cex
-  tmin <- min(xphylo1)
-  tmax <- max(xphylo2)
   
+  # Calculate plot time range considering last-negative-test dates and sample times
+  tmin <- min(xphylo1, na.rm = TRUE)
+  tmax <- max(xphylo2, na.rm = TRUE)
   
+  # Extend tmin to include last-negative-test dates if they're earlier
+  if(!is.null(plotinput$d$last.negative)){
+    print("Last negative")
+    print(plotinput$d$last.negative)
+    
+    min_lastneg <- min(plotinput$d$last.negative, na.rm = TRUE) + plotinput$d$reference.date
+    tmin <- min(tmin, min_lastneg)
+    
+    print("tmin=")
+    print(tmin)
+  }
+  
+  # Extend tmax to include sample times if they're later
+  if(!is.null(plotinput$d$sample.times)) {
+    max_sample <- max(plotinput$d$sample.times, na.rm = TRUE)
+    tmax <- max(tmax, max_sample, na.rm = TRUE)
+    
+    print("tmax=")
+    print(tmax)
+  }
   
   ### initialize plot
   plot.new()
   par(cex = 1)
   if(hostlabel || samplelabel) {
-    plot.window(xlim = c(tmin, tmax + label.space * hostlabel.cex * (tmax - tmin)), 
+    print("test")
+    plot.window(xlim = c(tmin-1, tmax + label.space * hostlabel.cex * (tmax - tmin)), 
                 ylim = c(0, max(yphylo2)))
   } else {
-    plot.window(xlim = c(tmin, tmax), 
+    print("test2")
+    plot.window(xlim = c(tmin-1, tmax+1), 
                 ylim = c(0, max(yphylo2)))
   }
   
   ### X-axis
-  do.call(Axis,
-          c(list(x = c(round(tmin), round(tmax)),
-                 side = 1,
-                 cex.axis = axis.cex),
-            graphicalparameters("axis", 1, ...)))
+  if (!is.null(xaxis.breaks) && xaxis.breaks != "auto") {
+    # Validate that tmin and tmax are finite
+    if (!is.finite(tmin) || !is.finite(tmax)) {
+      warning("Non-finite time values detected; using default axis labeling")
+      do.call(Axis,
+              c(list(side = 1,
+                     cex.axis = axis.cex),
+                graphicalparameters("axis", 1, ...)))
+    } else {
+      # Calculate tick positions based on xaxis.breaks interval
+      tick_positions <- seq(from = tmin, 
+                           to = tmax, 
+                           by = xaxis.breaks)
+      
+      do.call(Axis,
+              c(list(c(tmin, tmax),
+                     side = 1,
+                     at = tick_positions,
+                     cex.axis = axis.cex),
+                graphicalparameters("axis", 1, ...)))
+    }
+  } else {
+    # Use R's default axis labeling
+    do.call(Axis,
+            c(list(c(tmin, tmax),
+                   side = 1,
+                   cex.axis = axis.cex),
+              graphicalparameters("axis", 1, ...)))
+  }
 
   ### Axis title
   do.call(title,
