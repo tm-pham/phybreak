@@ -8,6 +8,9 @@
 #'   at least include the infection times of the hosts. For \code{p$trans.model = "sample+culling"}
 #'   also nodetimes of the sample nodes and the culling times of the hosts are needed as input.
 #' @param p The list with parameters for the model.  
+#' @param le The list with parameters and variables for the likelihood evaluation.
+#' @param lastneg.time The last negative test date/time of the current host, if available. 
+#' It makes certain infection times less likely (or impossible in the strict case).
 #' 
 #' @return The transmission probabilities of all hosts infected before the current host. For each host
 #'   with an infection time before the proposed infection time, the probability of being an infector
@@ -15,6 +18,7 @@
 #' 
 #' @export
 infect_distribution <- function(time, inftimes, le, 
+                                lastneg.time = NULL, 
                                 nodetimes = NULL,  
                                 host = NULL, log = FALSE){
   
@@ -48,7 +52,16 @@ infect_distribution <- function(time, inftimes, le,
     prob <- inf_func(time, inftimes, le,
                      nodetimes, host, log)
 
-    return(prob)
+  }
+  
+  ### Last-negative test times ###
+  if (!is.null(lastneg.time)){
+    shape <- le$p$sample.shape
+    scale <- le$p$sample.mean / shape
+    
+    # To compute the CDF at value x (e.g. t days after infection):
+    prob_neg <- prod(1 - pgamma(lastneg.time - time, shape=shape, scale=scale))
+    prob <- prob*prob_neg 
   }
 
   # if (le$p$contact){
@@ -75,4 +88,6 @@ infect_distribution <- function(time, inftimes, le,
   #     else return(prob * prob.cnt)
   #   }
   # }
+  
+  return(prob)
 }

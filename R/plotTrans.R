@@ -114,6 +114,7 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       vars <- list(sample.times = x$d$sample.times,
                    sample.hosts = x$d$hostnames,
                    culling.times = x$d$removal.times,
+                   last.negative = x$d$last.negative,
                    admin.times = x$d$admission.times,
                    sim.infection.times = tree2plot[, 3],
                    sim.infectors = as.character(tree2plot[, 1]),
@@ -227,6 +228,7 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
   infectors <- x$sim.infectors[timedorder]
   arrow.colours <- arrow.colours[timedorder]
   hosts <- names(inftimes)
+  lastneg.times <- x$last.negative[timedorder]
 
   ### determine rank of each host in the plot (line number)
   plotrank <- rankhostsforplot(hosts, infectors)
@@ -300,7 +302,7 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
     #widths <- abs(1 - (maxwd - dgamma(x0s - inftimes[i], shape = tgshape, scale = tgscale)) / maxwd)
     if(p$trans.model == "user"){
       widths <- sapply(x0s, function(x){
-        ifelse(x <= cultimes[i], infect_distribution(x, inftimes[i],
+        ifelse(x <= cultimes[i], infect_distribution(x, inftimes[i], lastneg.time = lastneg.times[i],
                                                      le = list(p = p, v = list(nodetimes = samtimes)),
                                                      nodetimes = samtimes), 0)
       })
@@ -308,14 +310,14 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
     } else if (!is.null(cultimes)) {
       widths <- sapply(x0s, function(x){
         #if (x0s < adtimes[i]) return(0)
-        if (x <= cultimes[i]) return(infect_distribution(x, inftimes[i],
+        if (x <= cultimes[i]) return(infect_distribution(x, inftimes[i], lastneg.time = lastneg.times[i],
                                                      le = list(p = p, v = list(nodetimes = samtimes)),
                                                      nodetimes = samtimes))
         else return(0)
       })
       widths <- abs(1 - (maxwd - widths)/maxwd)
     } else {
-      widths <- abs(1 - (maxwd - infect_distribution(x0s, inftimes[i], 
+      widths <- abs(1 - (maxwd - infect_distribution(x0s, inftimes[i], lastneg.time = lastneg.times[i],
                                                    le = list(p = p, v = list(nodetimes = samtimes)),
                                                    nodetimes = samtimes)) / maxwd)
     }

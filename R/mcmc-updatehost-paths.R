@@ -29,45 +29,11 @@ update_host_keepphylo <- function(hostID) {
   le <- environment()
   p <- pbe1$p
   v <- pbe1$v
-  d <- pbe1$d
   
-  ### Propose a new infection time
-  reference.date <- d$reference.date
-  if(!is.null(d$last.negative)){
-    last.negative.times <- d$last.negative
-    if(inherits(last.negative.times, "Date")) {
-      last.negative.times <- as.numeric(last.negative.times - reference.date)
-    }
-    # compute the maximum interval M_i in DAYS
-    M_i <- as.numeric(v$nodetimes[hostID]-last.negative.times[hostID])
-    # draw D ~ Gamma(shape,scale) but only accept if D <= M_i
-    repeat {
-      D_prop <- rgamma(1,
-                       shape = tinf.prop.shape.mult * p$sample.shape,
-                       scale = p$sample.mean /
-                         (tinf.prop.shape.mult * p$sample.shape))
-      if (is.na(M_i) || D_prop <= M_i) break
-    }
-    # now set tinf.prop so that the sampling interval is exactly D_prop
-    tinf.prop <- v$nodetimes[hostID] - D_prop
-  }else{
-    tinf.prop <- v$nodetimes[hostID] -
-      rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
-  }
-  
-  # ### propose the new infection time
-  # tinf.prop <- v$nodetimes[hostID] - 
-  #   rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
+  ### propose the new infection time
+  tinf.prop <- v$nodetimes[hostID] - 
+    rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
   copy2pbe1("tinf.prop", le)
-  
-  ### If we have a last-negative date and the proposal is before that date then never accept this proposal 
-  if(is.null(d$last.negative)){
-    print("Last negative dates not provided!")
-  }
-  
-  if(!is.null(d$last.negative) && !is.na(d$last.negative[hostID]) && tinf.prop < d$last.negative[hostID]){
-    return()
-  }
   
   ### identify the focal host's infector
   hostiorID <- v$infectors[hostID]
@@ -96,12 +62,6 @@ update_host_keepphylo <- function(hostID) {
       tinf2.prop <- v$nodetimes[hostiorID] - 
         rgamma(1, shape = tinf.prop.shape.mult * p$sample.shape, scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape))
       copy2pbe1("tinf2.prop", le)
-      
-      # Check last negative constraint for tinf2.prop
-      if(!is.null(d$last.negative) && !is.na(d$last.negative[hostiorID]) && tinf2.prop < d$last.negative[hostiorID]){
-        return()
-      }
-      
       if (tinf2.prop > timemrca) {
         # NNY (... & tinf2.prop after MRCA of hostID and hostiorID)
         hostioriorID <- v$infectors[hostiorID]
@@ -144,7 +104,7 @@ update_host_withinhost <- function(hostID) {
   } else {
     rewire_pathK_complete_classic()
   }
-
+  
   ### calculate proposal ratio
   logproposalratio <- 0
   
@@ -154,13 +114,10 @@ update_host_withinhost <- function(hostID) {
   ### calculate acceptance probability
   logaccprob <- pbe1$logLikseq - pbe0$logLikseq + logproposalratio
   
-  if(is.finite(logaccprob)){
-    ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("withinhost")
-    }
+  ### accept or reject
+  if (runif(1) < exp(logaccprob)) {
+    accept_pbe("withinhost")
   }
-
 }
 
 
@@ -175,36 +132,13 @@ update_host_phylotrans <- function(hostID, which_protocol) {
   p <- pbe0$p
   v <- pbe0$v
   
-  # ### propose the new infection time
-  # tinf.prop <- v$nodetimes[hostID] -
-  #   rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
+  ### propose the new infection time
+  tinf.prop <- v$nodetimes[hostID] -
+    rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
   # tinf.prop <- v$inftimes[hostID] + rnorm(1, 0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape))
   # tinf.prop <- min(tinf.prop, 2 * v$nodetimes[hostID] - tinf.prop)
-  # if (!is.null(d$admission.times))
-  #   if (tinf.prop < d$admission.times[hostID]) return()
-  ### If we have a last-negative date and the proposal is before that date then never accept this proposal 
-  reference.date <- d$reference.date
-  if(!is.null(d$last.negative)){
-    last.negative.times <- d$last.negative
-    if(inherits(last.negative.times, "Date")) {
-      last.negative.times <- as.numeric(last.negative.times - reference.date)
-    }
-    # compute the maximum interval M_i in DAYS
-    M_i <- as.numeric(v$nodetimes[hostID]-last.negative.times[hostID])
-    # draw D ~ Gamma(shape,scale) but only accept if D <= M_i
-    repeat {
-      D_prop <- rgamma(1,
-                       shape = tinf.prop.shape.mult * p$sample.shape,
-                       scale = p$sample.mean /
-                         (tinf.prop.shape.mult * p$sample.shape))
-      if (is.na(M_i) || D_prop <= M_i) break
-    }
-    # now set tinf.prop so that the sampling interval is exactly D_prop
-    tinf.prop <- v$nodetimes[hostID] - D_prop
-  }else{
-    tinf.prop <- v$nodetimes[hostID] -
-      rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
-  }
+  if (!is.null(d$admission.times))
+    if (tinf.prop < d$admission.times[hostID]) return()
   copy2pbe1("tinf.prop", le)
   
   ### going down the decision tree
@@ -260,37 +194,12 @@ update_host_history <- function(hostID, which_protocol) {
   p <- pbe0$p
   v <- pbe0$v
   
-  # ### propose the new infection time
-  # tinf.prop <- v$nodetimes[hostID] -
-  #   rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
+  ### propose the new infection time
+  tinf.prop <- v$nodetimes[hostID] -
+    rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
   
   #if (!is.null(d$admission.times) & hostID != 0)
   #  if (tinf.prop < d$admission.times[hostID]) return()
-  
-  ### If we have a last-negative date and the proposal is before that date then never accept this proposal
-  reference.date <- d$reference.date
-  if(!is.null(d$last.negative) && hostID !=0){
-    last.negative.times <- d$last.negative
-    if(inherits(last.negative.times, "Date")) {
-      last.negative.times <- as.numeric(last.negative.times - reference.date)
-    }
-    # compute the maximum interval M_i in DAYS
-    M_i <- as.numeric(v$nodetimes[hostID]-last.negative.times[hostID])
-    # draw D ~ Gamma(shape,scale) but only accept if D <= M_i
-    repeat {
-      D_prop <- rgamma(1,
-                       shape = tinf.prop.shape.mult * p$sample.shape,
-                       scale = p$sample.mean /
-                         (tinf.prop.shape.mult * p$sample.shape))
-      if (is.na(M_i) || D_prop <= M_i) break
-    }
-    # now set tinf.prop so that the sampling interval is exactly D_prop
-    tinf.prop <- v$nodetimes[hostID] - D_prop
-  }else{
-    tinf.prop <- v$nodetimes[hostID] -
-      rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
-  }
-  
   copy2pbe1("tinf.prop", le)
   
   ### going down the decision tree
@@ -304,7 +213,6 @@ update_host_history <- function(hostID, which_protocol) {
       update_pathL(which_protocol)
     }
   }
-
 }
 
 {
@@ -351,9 +259,10 @@ update_host_history <- function(hostID, which_protocol) {
     v <- pbe0$v
     hostID <- pbe1$hostID
     tinf.prop <- pbe1$tinf.prop
+    lastneg.time <- pbe1$d$last.negative[hostID]
     
     ### propose infector for hostID
-    infect.dist <- infect_distribution(tinf.prop, 
+    infect.dist <- infect_distribution(tinf.prop, lastneg.time = lastneg.time, 
                                        v$inftimes, list(d = d, p = p, v = v),
                                        nodetimes = v$nodetimes[v$nodetypes=="s"])
     dens.infectorproposal <- infect.dist +
@@ -365,7 +274,7 @@ update_host_history <- function(hostID, which_protocol) {
     
     infector.proposed.ID <- sample(p$obs, 1, prob = dens.infectorproposal)
     copy2pbe1("infector.proposed.ID", environment())
-
+    
     ### calculate proposal ratio
     # logproposalratio <- log(sum(dens.infectorproposal)/(dens.infectorproposal[infector.proposed.ID])) 
     logproposalratio <- log(sum(dens.infectorproposal)/(dens.infectorproposal[infector.proposed.ID])) +
@@ -412,7 +321,7 @@ update_host_history <- function(hostID, which_protocol) {
       infectees.newindex <- which(pbe0$v$infectors == newindexID)
       pbe0$v$nodetimes[newindexID] - sort(c(pbe0$v$inftimes[infectees.newindex], Inf))[1]
     }
-
+    
     # logproposalratio <- pnorm(v$inftimes[newindexID] - v$nodetimes[newindexID] + sampleinterval.newindex, 
     #                           0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape)) -
     #   pnorm(v$inftimes[newindexID] - v$nodetimes[newindexID] - sampleinterval.newindex, 
@@ -454,12 +363,13 @@ update_host_history <- function(hostID, which_protocol) {
     v <- pbe0$v
     hostID <- pbe1$hostID
     tinf.prop <- pbe1$tinf.prop
+    lastneg.time <- pbe1$d$last.negative[hostID]
     
     ### calculate proposal ratio 
     # the reverse proposal includes proposing an infector, 
     # so first identify the current infector
     infector.current.ID <- v$infectors[hostID]
-    infect.dist <- infect_distribution(v$inftimes[hostID], 
+    infect.dist <- infect_distribution(v$inftimes[hostID], lastneg.time = lastneg.time,
                                        v$inftimes, list(d = d, p = p, v = v),
                                        nodetimes = v$nodetimes[v$nodetypes=="s"])
     dens.infectorcurrent <- infect.dist +
@@ -501,24 +411,25 @@ update_host_history <- function(hostID, which_protocol) {
     v <- pbe0$v
     hostID <- pbe1$hostID
     tinf.prop <- pbe1$tinf.prop
-
+    lastneg.time <- pbe1$d$last.negative[hostID]
+    
     ### identify the current infector and propose the new infector
     infector.current.ID <- v$infectors[hostID]
-    infect.dist <- infect_distribution(tinf.prop, 
-                                                 v$inftimes, list(d =d, p = p, v = v),
-                                                 nodetimes = v$nodetimes[v$nodetypes=="s"])
+    infect.dist <- infect_distribution(tinf.prop, lastneg.time = lastneg.time,
+                                       v$inftimes, list(d =d, p = p, v = v),
+                                       nodetimes = v$nodetimes[v$nodetypes=="s"])
     dens.infectorproposal <- infect.dist +
       (tinf.prop - v$inftimes > 0)/pbe0$h$dist[hostID, ]
     dens.infectorproposal[which(v$tree != v$tree[hostID] | infect.dist == 0)] <- 0
     dens.infectorproposal[hostID] <- 0
-  
+    
     if(all(dens.infectorproposal == 0)) return()
     
     infector.proposed.ID <- sample(p$obs, 1, prob = dens.infectorproposal)
     
     ### calculate proposal ratio 
     # the reverse proposal includes proposing an infector
-    infect.dist <- infect_distribution(v$inftimes[hostID], 
+    infect.dist <- infect_distribution(v$inftimes[hostID], lastneg.time = lastneg.time,
                                        v$inftimes, list(d=d, p = p, v = v),
                                        nodetimes = v$nodetimes[v$nodetypes=="s"])
     dens.infectorcurrent <- infect.dist +
@@ -622,11 +533,9 @@ update_host_history <- function(hostID, which_protocol) {
     ### calculate acceptance probability
     logaccprob <- pbe1$logLikseq - pbe0$logLikseq + logproposalratio
     
-    if(is.finite(logaccprob)){
-      ### accept or reject
-      if (runif(1) < exp(logaccprob)) {
-        accept_pbe("withinhost")
-      }
+    ### accept or reject
+    if (runif(1) < exp(logaccprob)) {
+      accept_pbe("withinhost")
     }
   }
   
@@ -638,12 +547,13 @@ update_host_history <- function(hostID, which_protocol) {
     d <- pbe0$d
     hostID <- pbe1$hostID
     tinf.prop <- pbe1$tinf.prop
+    lastneg.time <- pbe1$d$last.negative[hostID]
     
     ### identify the current infector and propose the new infector
     infector.current.ID <- v$infectors[hostID]
     if (infector.current.ID == 0) infector.current.ID <- p$obs+1
     
-    infect.dist <- infect_distribution(tinf.prop, 
+    infect.dist <- infect_distribution(tinf.prop, lastneg.time = lastneg.time,
                                        v$inftimes, list(d = d, p = p, v = v),
                                        nodetimes = v$nodetimes[v$nodetypes=="s"])
     #print(infect.dist)                                   
@@ -661,7 +571,7 @@ update_host_history <- function(hostID, which_protocol) {
     
     ### calculate proposal ratio 
     # the reverse proposal includes proposing an infector
-    infect.dist <- infect_distribution(v$inftimes[hostID], 
+    infect.dist <- infect_distribution(v$inftimes[hostID], lastneg.time = lastneg.time,
                                        v$inftimes, list(d = d, p = p, v = v),
                                        nodetimes = v$nodetimes[v$nodetypes=="s"])
     dens.infectorcurrent <- c(infect.dist +
@@ -687,7 +597,7 @@ update_host_history <- function(hostID, which_protocol) {
     
     copy2pbe1("infector.proposed.ID", environment())
     copy2pbe1("logproposalratio", environment())
-     
+    
     ### propose minitrees and accept or reject
     if(which_protocol == "classic") {
       if(p$wh.bottleneck == "complete") {
@@ -713,16 +623,11 @@ update_host_history <- function(hostID, which_protocol) {
       logLiks <- setdiff(names(pbe0)[grepl("logLik", names(pbe0))], "logLikcoal")
       logacceptanceprob <- pbe0$heat * 
         (sum(sapply(logLiks, function(n) return(pbe1[[n]]))) + pbe1$logLiktoporatio -
-        sum(sapply(logLiks, function(n) return(pbe0[[n]])))) + pbe1$logproposalratio
+           sum(sapply(logLiks, function(n) return(pbe0[[n]])))) + pbe1$logproposalratio
       
-      
-      if(is.finite(logacceptanceprob)){
-        # accept or reject
-        if (runif(1) < exp(logacceptanceprob)) {
-          accept_pbe("phylotrans")
-        }
+      if (runif(1) < exp(logacceptanceprob)) {
+        accept_pbe("phylotrans")
       }
-
     }
     
     if(which_protocol == "edgewise") {
@@ -786,7 +691,7 @@ update_host_history <- function(hostID, which_protocol) {
     }
   }
   
-
+  
 }
 
 
@@ -830,11 +735,9 @@ update_host_history <- function(hostID, which_protocol) {
     logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal + pbe1$logLikdist - 
       pbe0$logLikgen - pbe0$logLiksam - pbe0$logLikcoal - pbe0$logLikdist + logproposalratio
     
-    if(is.finite(logaccprob)){
-      ### accept or reject
-      if (runif(1) < exp(logaccprob)) {
-        accept_pbe("trans")
-      }
+    ### accept or reject
+    if (runif(1) < exp(logaccprob)) {
+      accept_pbe("trans")
     }
   }
   
@@ -897,11 +800,6 @@ update_host_history <- function(hostID, which_protocol) {
     ### calculate acceptance probability
     logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal - pbe0$logLikgen - pbe0$logLiksam - pbe0$logLikcoal + 
       logproposalratio
-    
-    # Immediately reject any non-finite log-acceptance
-    if (!is.finite(logaccprob)) {
-      return()
-    }
     
     ### accept or reject
     if (runif(1) < exp(logaccprob)) {
@@ -1008,11 +906,9 @@ update_host_history <- function(hostID, which_protocol) {
     logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal - pbe0$logLikgen - pbe0$logLiksam - pbe0$logLikcoal + 
       logproposalratio
     
-    if(is.finite(logaccprob)){
-      ### accept or reject
-      if (runif(1) < exp(logaccprob)) {
-        accept_pbe("trans")
-      }
+    ### accept or reject
+    if (runif(1) < exp(logaccprob)) {
+      accept_pbe("trans")
     }
   }
   
@@ -1113,13 +1009,11 @@ update_host_history <- function(hostID, which_protocol) {
     ### calculate acceptance probability
     logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal - pbe0$logLikgen - pbe0$logLiksam - pbe0$logLikcoal + 
       logproposalratio
-
-    if(is.finite(logaccprob)){
-      ### accept or reject
-      if (runif(1) < exp(logaccprob)) {
-        accept_pbe("trans")
-      }
-    } 
+    
+    ### accept or reject
+    if (runif(1) < exp(logaccprob)) {
+      accept_pbe("trans")
+    }
   }
   
   

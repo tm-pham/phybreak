@@ -78,6 +78,7 @@ lik_gentimes <- function(le){
   v <- le$v
   indices <- v$infectors == 0
   othercases <- v$infectors > 0
+  lastneg.times <- le$d$last.negative[othercases]
   
   intro.rate <- ifelse(is.null(p$intro.rate), 1, p$intro.rate)
   R <- ifelse(is.null(p$R), 1, p$R)
@@ -91,66 +92,16 @@ lik_gentimes <- function(le){
     return(L)
   else
     return( L +
-            sum(log(R) + infect_distribution(time = v$inftimes[othercases],
+            sum(log(R) + infect_distribution(time = v$inftimes[othercases], lastneg.time = lastneg.times,
                                              inftimes = v$inftimes[v$infectors[othercases]],
                                              nodetimes = v$nodetimes[v$nodetypes=="s"][v$infectors[othercases]],
                                              le = le, log = TRUE)))
 }
 
 ### calculate the log-likelihood of sampling intervals 
-# lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes) {
-#   sum(dgamma(nodetimes[1:obs] - inftimes, shape = shapeS, scale = meanS/shapeS, log = TRUE))
-# }
-
-### helper: Truncated gamma distribution for incorporating last negative test results
-log_d_trunc_gamma <- function(d, shape, scale, M=NA) {
-  # if a truncation bound is set
-  if (!is.na(M)) {
-    # values above the bound have zero density
-    if (d > M) {
-      return(-Inf)
-    }
-    dgamma(d, shape = shape, scale = scale, log = TRUE) -
-      log(pgamma(M, shape = shape, scale = scale))
-  } else {
-    dgamma(d, shape = shape, scale = scale, log = TRUE)
-  }
+lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes) {
+  sum(dgamma(nodetimes[1:obs] - inftimes, shape = shapeS, scale = meanS/shapeS, log = TRUE))
 }
-
-
-### calculate the log-likelihood of sampling intervals with truncation
-lik_sampletimes <- function(obs,
-                            shapeS, meanS,
-                            nodetimes,
-                            inftimes,
-                            last.neg = NULL) {
-  scaleS <- meanS / shapeS
-  
-  # intervals D_i
-  D <- as.numeric(difftime(nodetimes[1:obs], inftimes[1:obs]))
-  if (any(D <= 0)) {
-    return(-Inf)
-  }
-  
-  # compute truncation points M_i if last.neg is provided
-  if (!is.null(last.neg)) {
-    M <- as.numeric(difftime(nodetimes[1:obs], last.neg[1:obs]))
-    # any negative M means last.neg > sampletime; treat as NA
-    M[M < 0] <- NA
-  } else {
-    M <- rep(NA, length(D))
-  }
-  
-  # vectorized sum of log-densities
-  ll <- sum(mapply(log_d_trunc_gamma,
-                   d     = as.numeric(D),
-                   shape = shapeS,
-                   scale = scaleS,
-                   M     = as.numeric(M)))
-  return(ll)
-}
-
-
 
 
 ### calculate the log-likelihood of distances 
