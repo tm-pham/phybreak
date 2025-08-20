@@ -50,16 +50,17 @@ infect_distribution <- function(time, inftimes, le,
                       scale = le$p$gen.mean/le$p$gen.shape,
                       log = FALSE)
     } else {
-      inf_func <- le$p$inf_function
-      prob <- inf_func(time, inftimes, le, nodetimes, host, log)
+      # inf_func <- le$p$inf_function
+      prob <- le$p$inf_function(time, inftimes, le, nodetimes, host, log)
+      prob <- prob*prob_neg # If last-negative time is given, multiply with the probability of not being infected before that time
     }
     
 
   ### User-defined generation distribution ###
   } else if(trans.model =="user") {
     #print(list(time, inftimes, le, nodetimes, host, log))
-    inf_func <- le$p$inf_function
-    prob <- inf_func(time, inftimes, le, nodetimes, host, log)
+    # inf_func <- le$p$inf_function
+    prob <- le$p$inf_function(time, inftimes, le, nodetimes, host, log)
     prob <- prob*prob_neg # If last-negative time is given, multiply with the probability of not being infected before that time
     return(prob)
 
