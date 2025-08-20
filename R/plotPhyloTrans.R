@@ -503,14 +503,8 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
   ###########################################
   
   ### input for phylotrees ###
-  # Properly handle Date vs numeric reference dates
-  if(inherits(plotinput$d$reference.date, "Date")) {
-    xphylo1 <- plotinput$d$reference.date + completetree$x1vec
-    xphylo2 <- plotinput$d$reference.date + completetree$x2vec
-  } else {
-    xphylo1 <- completetree$x1vec + plotinput$d$reference.date
-    xphylo2 <- completetree$x2vec + plotinput$d$reference.date
-  }
+  xphylo1 <- completetree$x1vec + plotinput$d$reference.date
+  xphylo2 <- completetree$x2vec + plotinput$d$reference.date
   yphylo1 <- completetree$y1vec 
   yphylo2 <- completetree$y2vec 
   colphylo <- completetree$hostvec + 1
@@ -522,7 +516,6 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
     unlist(sapply(hosttrees, 
                   function(xx) xx$x1vec[xx$x1vec == min(xx$x1vec) & xx$x1vec >= min(plotinput$v$inftimes)]))
   ) + plotinput$d$reference.date
-
   ynodes <- c(
     completetree$y1vec[completetree$nodevec %in%
                          which(plotinput$v$nodetypes %in% c("t", "b"))],
@@ -539,12 +532,7 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
   ### input for transmission links ###
   if(0 %in% hosts2plot) hosts2plot <- hosts2plot[-which(hosts2plot == 0)]
   links2plot <- hosts2plot[plotinput$v$infectors[hosts2plot] %in% hosts2plot]
-  # Apply Date-safe arithmetic
-  if(inherits(plotinput$d$reference.date, "Date")) {
-    xtrans <- plotinput$d$reference.date + plotinput$v$inftimes[links2plot]
-  } else {
-    xtrans <- plotinput$v$inftimes[links2plot] + plotinput$d$reference.date
-  }
+  xtrans <- plotinput$v$inftimes[links2plot] + plotinput$d$reference.date
   ytrans1 <- sapply(links2plot,
                     function(xx) c(
                       min(ynodes[infecteehosts == xx]))
@@ -556,19 +544,17 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
 
   ### input for hosts ###
   # Extend host shaded areas to last-negative-test dates if available
-  # Apply Date-safe arithmetic for infection times
-  xhost1 <- plotinput$d$reference.date + plotinput$v$inftimes[hosts2plot]
-  
+  xhost1 <- plotinput$v$inftimes[hosts2plot] + plotinput$d$reference.date
   if(!is.null(plotinput$d$last.negative)) {
     xlastneg_for_hosts <- plotinput$d$last.negative[hosts2plot]
-    # Convert to same scale for comparison
+    # Convert to same scale as xhost1
     if(inherits(plotinput$d$reference.date, "Date")) {
-      # Both should be Date objects
+      # Working with Date objects
       if(!inherits(xlastneg_for_hosts, "Date")) {
         xlastneg_for_hosts <- plotinput$d$reference.date + xlastneg_for_hosts
       }
     } else {
-      # Both should be numeric
+      # Working with numeric values
       if(inherits(xlastneg_for_hosts, "Date")) {
         xlastneg_for_hosts <- as.numeric(xlastneg_for_hosts - plotinput$d$reference.date) + plotinput$d$reference.date
       } else {
@@ -579,8 +565,6 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
     valid_lastneg <- !is.na(xlastneg_for_hosts)
     xhost1[valid_lastneg] <- pmin(xhost1[valid_lastneg], xlastneg_for_hosts[valid_lastneg])
   }
-  
-  # Apply Date-safe arithmetic for host end times
   xhost2 <- sapply(hosts2plot, function(xx) max(completetree$x2vec[xx == completetree$hostvec])) + plotinput$d$reference.date
   yhost1 <- sapply(hosts2plot, function(xx) min(completetree$y1vec[xx == completetree$hostvec])) - 0.25
   yhost2 <- sapply(hosts2plot, function(xx) max(completetree$y1vec[xx == completetree$hostvec])) + 0.25
@@ -664,36 +648,66 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
   tmax <- max(xphylo2, na.rm = TRUE)
   
   # Extend tmin to include last-negative-test dates if they're earlier
-  if(!is.null(plotinput$d$last.negative)){
-    print("Last negative")
-    print(plotinput$d$last.negative)
-    
-    min_lastneg <- min(plotinput$d$last.negative, na.rm = TRUE) + plotinput$d$reference.date
-    tmin <- min(tmin, min_lastneg)
-    
-    print("tmin=")
-    print(tmin)
+  if(!is.null(plotinput$d$last.negative)) {
+    xlastneg_all <- plotinput$d$last.negative
+    # Convert to same scale as tmin/tmax
+    if(inherits(plotinput$d$reference.date, "Date")) {
+      # Working with Date objects
+      if(!inherits(xlastneg_all, "Date")) {
+        xlastneg_all <- plotinput$d$reference.date + xlastneg_all
+      }
+    } else {
+      # Working with numeric values  
+      if(inherits(xlastneg_all, "Date")) {
+        xlastneg_all <- as.numeric(xlastneg_all - plotinput$d$reference.date) + plotinput$d$reference.date
+      } else {
+        xlastneg_all <- xlastneg_all + plotinput$d$reference.date
+      }
+    }
+    valid_lastneg_all <- !is.na(xlastneg_all) & is.finite(xlastneg_all)
+    if(any(valid_lastneg_all)) {
+      min_lastneg <- min(xlastneg_all[valid_lastneg_all], na.rm = TRUE)
+      if(is.finite(min_lastneg)) {
+        tmin <- min(tmin, min_lastneg)
+      }
+    }
   }
   
   # Extend tmax to include sample times if they're later
   if(!is.null(plotinput$d$sample.times)) {
-    max_sample <- max(plotinput$d$sample.times, na.rm = TRUE)
-    tmax <- max(tmax, max_sample, na.rm = TRUE)
-    
-    print("tmax=")
-    print(tmax)
+    xsample_all <- plotinput$d$sample.times
+    # Convert to same scale as tmin/tmax
+    if(inherits(plotinput$d$reference.date, "Date")) {
+      # Working with Date objects
+      if(!inherits(xsample_all, "Date")) {
+        xsample_all <- plotinput$d$reference.date + xsample_all
+      }
+    } else {
+      # Working with numeric values
+      if(inherits(xsample_all, "Date")) {
+        xsample_all <- as.numeric(xsample_all - plotinput$d$reference.date) + plotinput$d$reference.date
+      } else {
+        xsample_all <- xsample_all + plotinput$d$reference.date
+      }
+    }
+    max_sample <- max(xsample_all, na.rm = TRUE)
+    if(is.finite(max_sample)) {
+      tmax <- max(tmax, max_sample)
+    }
   }
+
+  # Use automatically calculated limits
+  plot_xlim <- c(tmin, tmax)
+
   
   ### initialize plot
   plot.new()
   par(cex = 1)
   if(hostlabel || samplelabel) {
-    print("test")
-    plot.window(xlim = c(tmin-1, tmax + label.space * hostlabel.cex * (tmax - tmin)), 
+    plot.window(xlim = c(plot_xlim[1], plot_xlim[2] + label.space * hostlabel.cex * (plot_xlim[2] - plot_xlim[1])), 
                 ylim = c(0, max(yphylo2)))
   } else {
-    print("test2")
-    plot.window(xlim = c(tmin-1, tmax+1), 
+    plot.window(xlim = plot_xlim, 
                 ylim = c(0, max(yphylo2)))
   }
   
@@ -708,22 +722,52 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
                 graphicalparameters("axis", 1, ...)))
     } else {
       # Calculate tick positions based on xaxis.breaks interval
-      tick_positions <- seq(from = tmin, 
-                           to = tmax, 
-                           by = xaxis.breaks)
-      
-      do.call(Axis,
-              c(list(c(tmin, tmax),
-                     side = 1,
-                     at = tick_positions,
-                     cex.axis = axis.cex),
-                graphicalparameters("axis", 1, ...)))
+      if (inherits(tmin, "Date") || inherits(tmax, "Date")) {
+        # For Date objects, convert to numeric for calculations
+        tmin_numeric <- as.numeric(tmin)
+        tmax_numeric <- as.numeric(tmax)
+        
+        # Additional check for finite numeric values after conversion
+        if (!is.finite(tmin_numeric) || !is.finite(tmax_numeric)) {
+          warning("Non-finite Date values detected; using default axis labeling")
+          do.call(Axis,
+                  c(list(side = 1,
+                         cex.axis = axis.cex),
+                    graphicalparameters("axis", 1, ...)))
+        } else {
+          tick_positions <- seq(from = ceiling(tmin_numeric / xaxis.breaks) * xaxis.breaks,
+                               to = floor(tmax_numeric / xaxis.breaks) * xaxis.breaks,
+                               by = xaxis.breaks)
+          # Convert back to Date if original was Date
+          tick_positions <- as.Date(tick_positions, origin = "1970-01-01")
+          tick_positions <- tick_positions[tick_positions >= tmin & tick_positions <= tmax]
+
+          do.call(Axis,
+                  c(list(side = 1,
+                         at = as.numeric(tick_positions),
+                         labels = format(tick_positions, "%b %d"),
+                         cex.axis = axis.cex),
+                    graphicalparameters("axis", 1, ...)))
+        }
+      } else {
+        # For numeric values, use direct calculation
+        tick_positions <- seq(from = ceiling(tmin / xaxis.breaks) * xaxis.breaks,
+                             to = floor(tmax / xaxis.breaks) * xaxis.breaks,
+                             by = xaxis.breaks)
+        tick_positions <- tick_positions[tick_positions >= tmin & tick_positions <= tmax]
+        
+        do.call(Axis,
+                c(list(side = 1,
+                       at = tick_positions,
+                       labels = format(as.Date(tick_positions, origin = "1970-01-01"), "%b %d"),
+                       cex.axis = axis.cex),
+                  graphicalparameters("axis", 1, ...)))
+      }
     }
   } else {
     # Use R's default axis labeling
     do.call(Axis,
-            c(list(c(tmin, tmax),
-                   side = 1,
+            c(list(side = 1,
                    cex.axis = axis.cex),
               graphicalparameters("axis", 1, ...)))
   }
