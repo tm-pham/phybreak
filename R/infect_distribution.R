@@ -51,8 +51,7 @@ infect_distribution <- function(time, inftimes, le,
                       log = FALSE)
     } else {
       inf_func <- le$p$inf_function
-      prob <- inf_func(time, inftimes, le,
-                       nodetimes, host, log)
+      prob <- inf_func(time, inftimes, le, nodetimes, host, log)
     }
     
 
@@ -60,8 +59,7 @@ infect_distribution <- function(time, inftimes, le,
   } else if(trans.model =="user") {
     #print(list(time, inftimes, le, nodetimes, host, log))
     inf_func <- le$p$inf_function
-    prob <- inf_func(time, inftimes, le,
-                     nodetimes, host, log)
+    prob <- inf_func(time, inftimes, le, nodetimes, host, log)
     prob <- prob*prob_neg # If last-negative time is given, multiply with the probability of not being infected before that time
     return(prob)
 

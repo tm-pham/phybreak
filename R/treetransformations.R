@@ -118,7 +118,7 @@ phybreak2phylo <- function(vars, samplenames = c(), simmap = FALSE) {
 }
 
 phybreak2trans <- function(vars, hostnames = c(), reference.date = 0,
-                           culling.times = NULL, last.negative = NULL) {
+                           culling.times = NULL) {
   ### extract variables
   nodetimes <- vars$nodetimes
   nodehosts <- vars$nodehosts
@@ -146,7 +146,6 @@ phybreak2trans <- function(vars, hostnames = c(), reference.date = 0,
   return(list(
     sample.times = samtimes,
     culling.times = culling.times,
-    last.negative = last.negative,
     sim.infection.times = inftimes,
     sim.infectors = infectors
   ))
@@ -155,14 +154,9 @@ phybreak2trans <- function(vars, hostnames = c(), reference.date = 0,
 
 transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL, 
                                 introductions = 1, NJtree = FALSE) {
-
+  
   ### extract and order samples
   refdate <- min(vars$sample.times)
-
-  if(!is.null(vars$last.negative)){
-    lastnegtimes <- vars$last.negative - refdate
-  }
-
   samtimes <- vars$sample.times - refdate
   nsamples <- length(samtimes)
   if(exists("sample.hosts", vars)) {
@@ -202,13 +196,13 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
   hostnames <- unique(samhosts)
   samhosts <- match(samhosts, hostnames)
   nhosts <- length(hostnames)
-
+  
   ### infection times and infectors
   if(is.null(vars$sim.infection.times) | is.null(vars$sim.infectors) | resample) {
     resample <- TRUE
-    inftimes <- .rinftimes(samtimes[1:nhosts], resamplepars$sample.mean, resamplepars$sample.shape, lastneg = lastnegtimes[1:nhosts])
+    inftimes <- .rinftimes(samtimes[1:nhosts], resamplepars$sample.mean, resamplepars$sample.shape)
     infectors <- .rinfectors(inftimes, introductions, d = c(vars, reference.date = refdate), p = resamplepars, 
-                               v = list(nodetimes = samtimes))
+                             v = list(nodetimes = samtimes))
   } else {
     inftimes <- as.numeric(vars$sim.infection.times - refdate)
     infectors <- match(vars$sim.infectors, hostnames)
@@ -223,7 +217,7 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
     if (NJtree) {
       # get mini-tree of history host from NJ tree
       hist.phytree <- get_history_minitree(vars, nsamples, nhosts)
- 
+      
       res <- list(
         inftimes = inftimes,
         infectors = rep(0, nhosts),
@@ -255,7 +249,7 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
         nodeparents = rep(-1, 2 * nsamples + nhosts - 1)
       )
       list2env(list(v = res, p = resamplepars, d = list(nsamples = nsamples)), pbe1)
-  
+      
       if(resamplepars$wh.bottleneck == "wide") {
         invisible(sapply(1:nhosts, rewire_pullnodes_wide))
       } else if (introductions == 1){
@@ -380,7 +374,7 @@ whichgeneration <- function(infectors, hostID) {
 
 
 ### random infection times given sampling times and sampling interval distribution
-.rinftimes <- function(st, meanS, shapeS, lastneg = NULL) {
+.rinftimes <- function(st, meanS, shapeS) {
   ### tests
   if(class(st) != "numeric" && class(st) != "integer") {
     stop(".rinftimes called with non-numeric sampling times")
@@ -389,20 +383,7 @@ whichgeneration <- function(infectors, hostID) {
   if(shapeS <= 0) stop(".rinftimes called with non-positive shape parameter")
   
   ### function body
-  tinf.prop <- rep(NA, length(st))
-  if(!is.null(lastneg)) {
-    for(i in 1:length(st)){
-      M_i <- as.numeric(st[i]-lastneg[i])
-      repeat{
-        D_prop <- rgamma(1, shape = shapeS, scale = meanS/shapeS)
-        if (is.na(M_i) || D_prop <= M_i) break
-      }
-      tinf.prop[i] <- st[i] - D_prop
-    }
-  }else{
-    tinf.prop <- st - rgamma(length(st), shape = shapeS, scale = meanS/shapeS)
-  }
-  return(tinf.prop)
+  st - rgamma(length(st), shape = shapeS, scale = meanS/shapeS)
 }
 
 ### random infectors given infection times and generation interval distribution
@@ -421,7 +402,7 @@ whichgeneration <- function(infectors, hostID) {
   res <- rep(0, length(it))
   for(i in 1:length(it)) {
     if(it[i] > min(it)) {
-      dist <- infect_distribution(it[i], it, lastneg.time = NULL, 
+      dist <- infect_distribution(it[i], it, lastneg.time = d$last.negative[i], 
                                   nodetimes = v$nodetimes[1:length(it)], 
                                   le = list(d=d, p=p, v=c(v, list(inftimes = it))))
       dist[i] <- 0
