@@ -133,7 +133,7 @@ build_pbe <- function(phybreak.obj) {
   if(inherits(d$last.negative, "Date")) {
     d$last.negative <- as.numeric(d$last.negative - d$reference.date)
   }
-  logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes, last.neg = d$last.negative)
+  logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes)
   logLikgen <- lik_gentimes(le)
   logLikcoal <- lik_coaltimes(le)
 
@@ -257,7 +257,7 @@ propose_pbe <- function(f) {
     if(inherits(d$last.negative, "Date")) {
       d$last.negative <- as.numeric(d$last.negative - d$reference.date)
     }
-    logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes, last.neg = d$last.negative)
+    logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes)
     copy2pbe1("logLiksam", le)
   }
   
