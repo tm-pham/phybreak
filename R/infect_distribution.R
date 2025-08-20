@@ -25,6 +25,17 @@ infect_distribution <- function(time, inftimes, le,
   ### Gamma distributed ####
   trans.model <- ifelse(is.null(le$p$trans.model), "gamma", le$p$trans.model)
   
+  ### Last-negative test times ###
+  if (!is.null(lastneg.time)){
+    shape <- le$p$sample.shape
+    scale <- le$p$sample.mean / shape
+    
+    # To compute the CDF at value x (e.g. t days after infection):
+    prob_neg <- prod(1 - pgamma(lastneg.time - time, shape=shape, scale=scale))
+  }else{
+    prob_neg <- 1
+  }
+  
   if(trans.model == "gamma") {
     if(is.null(le$d$removal.times)){
     
@@ -51,18 +62,12 @@ infect_distribution <- function(time, inftimes, le,
     inf_func <- le$p$inf_function
     prob <- inf_func(time, inftimes, le,
                      nodetimes, host, log)
+    prob <- prob*prob_neg # If last-negative time is given, multiply with the probability of not being infected before that time
+    return(prob)
 
   }
   
-  ### Last-negative test times ###
-  if (!is.null(lastneg.time)){
-    shape <- le$p$sample.shape
-    scale <- le$p$sample.mean / shape
-    
-    # To compute the CDF at value x (e.g. t days after infection):
-    prob_neg <- prod(1 - pgamma(lastneg.time - time, shape=shape, scale=scale))
-    prob <- prob*prob_neg 
-  }
+
 
   # if (le$p$contact){
   #   if (length(time) == 1){
@@ -89,5 +94,5 @@ infect_distribution <- function(time, inftimes, le,
   #   }
   # }
   
-  return(prob)
+
 }
