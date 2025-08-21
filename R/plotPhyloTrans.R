@@ -94,7 +94,7 @@ plotPhyloTrans <- function(x, plot.which = c("sample", "mpc", "mtcc", "mcc"), sa
                            host.col = tree.col, host.alpha = 0.2,
                            cline.lty = 3, cline.lwd = 1, cline.col = "black", 
                            cpoint.pch = 20, cpoint.cex = 1, cpoint.col = tree.col, 
-                           xlab = "Time", xaxis.breaks = NULL, axis.cex = 1, title.cex = 1, ...) {
+                           xlab = "Time", xaxis.breaks = NULL, reference_date = NULL, axis.cex = 1, title.cex = 1, ...) {
   ### tests ###
   if(!("phytools" %in% .packages(TRUE))) {
     stop("package 'phytools' should be installed for this function")
@@ -182,7 +182,8 @@ plotPhyloTrans <- function(x, plot.which = c("sample", "mpc", "mtcc", "mcc"), sa
                      host.col = host.col, host.alpha = host.alpha,
                      cline.lty = cline.lty, cline.lwd = cline.lwd, cline.col = cline.col, 
                      cpoint.pch = cpoint.pch, cpoint.cex = cpoint.cex, cpoint.col = cpoint.col, 
-                     xlab = xlab, xaxis.breaks = xaxis.breaks, axis.cex = axis.cex, title.cex = title.cex, ...)
+                     xlab = xlab, xaxis.breaks = xaxis.breaks, axis.cex = axis.cex, title.cex = title.cex, 
+                     reference_date = reference_date, ...)
 }
 
 
@@ -199,7 +200,8 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
                                host.col = tree.col, host.alpha = 0.2,
                                cline.lty = 3, cline.lwd = 1, cline.col = "black", 
                                cpoint.pch = 20, cpoint.cex = 1, cpoint.col = tree.col, 
-                               xlab = "Time", xaxis.breaks = NULL, axis.cex = 1, title.cex = 1, ...) {
+                               xlab = "Time", xaxis.breaks = NULL, axis.cex = 1, title.cex = 1, 
+                               reference_date = NULL, ...) {
   oldmar <- par("mar")
   par(mar = mar)
   on.exit(par(mar = oldmar))
@@ -739,7 +741,7 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
                                to = floor(tmax_numeric / xaxis.breaks) * xaxis.breaks,
                                by = xaxis.breaks)
           # Convert back to Date if original was Date
-          tick_positions <- as.Date(tick_positions, origin = "1970-01-01")
+          tick_positions <- as.Date(tick_positions, origin = reference_date)
           tick_positions <- tick_positions[tick_positions >= tmin & tick_positions <= tmax]
 
           do.call(Axis,
@@ -759,7 +761,7 @@ makephylotransplot <- function(plotinput, select.how = "trees", select.who = "in
         do.call(Axis,
                 c(list(side = 1,
                        at = tick_positions,
-                       labels = format(as.Date(tick_positions, origin = "1970-01-01"), "%b %d"),
+                       labels = format(as.Date(tick_positions, origin = reference_date), "%b %d"),
                        cex.axis = axis.cex),
                   graphicalparameters("axis", 1, ...)))
       }
