@@ -549,6 +549,11 @@ update_host_history <- function(hostID, which_protocol) {
     tinf.prop <- pbe1$tinf.prop
     lastneg.time <- pbe1$d$last.negative[hostID]
     
+    print("In update_pathL:\n")
+    cat("HostID = ", hostID, "\n")
+    cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
+    cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
+    
     ### identify the current infector and propose the new infector
     infector.current.ID <- v$infectors[hostID]
     if (infector.current.ID == 0) infector.current.ID <- p$obs+1

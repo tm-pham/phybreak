@@ -124,7 +124,7 @@ plotTrans <- function(x, plot.which = c("sample", "edmonds", "mpc", "mtcc"), sam
       names(vars$sim.infectors) <- x$d$hostnames[1:x$p$obs]
       names(vars$post.support) <- x$d$hostnames[1:x$p$obs]
       if(is.null(arrow.col)) {
-        arrow.col <- c("blue", "green", "orange", "red", "purple")
+        arrow.col <- c("darkblue", "darkgreen", "orange", "darkred", "darkorchid4")
       }
       tg.mean <- median(x$s$mG)
       tg.shape = x$p$gen.shape
