@@ -30,6 +30,12 @@ rewire_within_complete_edgewise <- function(ID, tinf) {
   pbe1$v$nodetimes[btnodes] <- tinf
   pbe1$v$inftimes[ID] <- tinf
   
+  print("In rewire_within_complete_edgewise: \n")
+  cat("ID = ", ID, "\n")
+  cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
+  cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
+  cat("pbe1$v$nodeparents = ", pbe1$v$nodeparents, "\n")
+  
   if(any(pbe1$v$nodetimes[pbe1$v$nodehosts == ID] - 
          pbe1$v$nodetimes[pbe1$v$nodeparents[pbe1$v$nodehosts == ID]] < 0)) {
     pbe1$logLiktoporatio <- -Inf
