@@ -98,6 +98,11 @@ update_host_withinhost <- function(hostID) {
   prepare_pbe()
   copy2pbe1("hostID", environment())
   
+  print("In update_host_withinhost:\n")
+  cat("HostID = ", hostID, "\n")
+  cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
+  cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
+  
   ### change the tree
   if(pbe0$p$wh.bottleneck == "wide") {
     rewire_pathK_wide_classic()
@@ -140,6 +145,11 @@ update_host_phylotrans <- function(hostID, which_protocol) {
   if (!is.null(d$admission.times))
     if (tinf.prop < d$admission.times[hostID]) return()
   copy2pbe1("tinf.prop", le)
+  
+  print("In update_host_phylotrans:\n")
+  cat("HostID = ", hostID, "\n")
+  cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
+  cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
   
   ### going down the decision tree
   if (v$infectors[hostID] == 0) {
@@ -202,6 +212,11 @@ update_host_history <- function(hostID, which_protocol) {
   #  if (tinf.prop < d$admission.times[hostID]) return()
   copy2pbe1("tinf.prop", le)
   
+  print("In update_host_history:\n")
+  cat("HostID = ", hostID, "\n")
+  cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
+  cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
+  
   ### going down the decision tree
   if (hostID == 0) {
     # Y (hostID is history)
@@ -234,6 +249,11 @@ update_host_history <- function(hostID, which_protocol) {
              shape = tinf.prop.shape.mult * p$sample.shape,
              scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)
     copy2pbe1("logproposalratio", environment())
+    
+    print("In update_pathA:\n")
+    cat("HostID = ", hostID, "\n")
+    cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
+    cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
     
     ### propose minitrees and accept or reject
     if(which_protocol == "classic") {
@@ -274,6 +294,11 @@ update_host_history <- function(hostID, which_protocol) {
     
     infector.proposed.ID <- sample(p$obs, 1, prob = dens.infectorproposal)
     copy2pbe1("infector.proposed.ID", environment())
+    
+    print("In update_pathB:\n")
+    cat("HostID = ", hostID, "\n")
+    cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
+    cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
     
     ### calculate proposal ratio
     # logproposalratio <- log(sum(dens.infectorproposal)/(dens.infectorproposal[infector.proposed.ID])) 
@@ -336,6 +361,11 @@ update_host_history <- function(hostID, which_protocol) {
              scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log.p = TRUE)
     copy2pbe1("logproposalratio", environment())
     
+    print("In update_pathC:\n")
+    cat("HostID = ", hostID, "\n")
+    cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
+    cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
+    
     ### propose minitrees and accept or reject
     if(logproposalratio > -Inf) {
       ### propose minitrees and accept or reject
@@ -386,6 +416,11 @@ update_host_history <- function(hostID, which_protocol) {
              shape = tinf.prop.shape.mult * p$sample.shape,
              scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)    
     copy2pbe1("logproposalratio", environment())
+    
+    print("In update_pathD:\n")
+    cat("HostID = ", hostID, "\n")
+    cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
+    cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
     
     ### propose minitrees and accept or reject
     if(which_protocol == "classic") {
@@ -451,6 +486,11 @@ update_host_history <- function(hostID, which_protocol) {
     copy2pbe1("infector.proposed.ID", environment())
     copy2pbe1("logproposalratio", environment())
     
+    print("In update_pathE:\n")
+    cat("HostID = ", hostID, "\n")
+    cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
+    cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
+    
     ### propose minitrees and accept or reject
     if(which_protocol == "classic") {
       if(p$wh.bottleneck == "complete") {
@@ -490,6 +530,11 @@ update_host_history <- function(hostID, which_protocol) {
              shape = tinf.prop.shape.mult * p$sample.shape,
              scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log.p = TRUE)
     copy2pbe1("logproposalratio", environment())
+    
+    print("In update_pathF:\n")
+    cat("HostID = ", hostID, "\n")
+    cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
+    cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
     
     ### propose minitrees and accept or reject
     if(logproposalratio > -Inf) {
