@@ -18,28 +18,32 @@ rewire_change_infector_wide <- function(ID, newinfector) {
 
 
 rewire_within_wide_edgewise <- function(ID, tinf) {
+  cat("In rewire_within_wide_edgewise: \n")
+  cat("ID = ", ID, "\n")
   coalnodes <- which(pbe1$v$nodehosts == ID & pbe1$v$nodetypes == "c")
+  cat("coalnodes = ", coalnodes, "\n")
   coaltimes_old <- pbe1$v$nodetimes[coalnodes]
+  cat("coaltimes_old = ", coaltimes_old, "\n")
   
   coaltimes_new <- sample_coaltimes(pbe1$v$nodetimes[pbe1$v$nodehosts == ID & pbe1$v$nodetypes != "c"],
                                     tinf, pbe1$p)
+  cat("coaltimes_new (before filtering) = ", coaltimes_new, "\n")
   coaltimes_new <- coaltimes_new[coaltimes_new > tinf]
+  cat("coaltimes_new (after filtering) = ", coaltimes_new, "\n")
   
 
   if(length(coaltimes_new) == length(coaltimes_old)) {
     pbe1$logLiktoporatio <- pbe1$logLiktoporatio - lik_topology_host(pbe1, ID)
     
     coaltimes_new <- coaltimes_new[rank(coaltimes_old)]
+    cat("coaltimes_new (after ranking) = ", coaltimes_new, "\n")
     
     pbe1$v$nodetimes[coalnodes] <- coaltimes_new
     btnodes <- pbe1$v$nodeparents[pbe1$v$nodehosts == ID]
     btnodes <- btnodes[pbe1$v$nodetypes[btnodes] != "c"]
     pbe1$v$nodetimes[btnodes] <- tinf
     pbe1$v$inftimes[ID] <- tinf
-    
-    # Print
-    print("In rewire_within_wide_edgewise: \n")
-    cat("ID = ", ID, "\n")
+    cat("tinf = ", tinf, "\n")
     cat("pbe1$v$nodehosts = ", pbe1$v$nodehosts, "\n")
     cat("pbe1$v$nodetimes = ", pbe1$v$nodetimes, "\n")
     cat("pbe1$v$nodeparents = ", pbe1$v$nodeparents, "\n")
