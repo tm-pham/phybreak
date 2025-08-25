@@ -18,7 +18,6 @@ rewire_change_infector_wide <- function(ID, newinfector) {
 
 
 rewire_within_wide_edgewise <- function(ID, tinf) {
-  cat("In rewire_within_wide_edgewise: \n")
   coalnodes <- which(pbe1$v$nodehosts == ID & pbe1$v$nodetypes == "c")
   coaltimes_old <- pbe1$v$nodetimes[coalnodes]
   
