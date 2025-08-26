@@ -30,9 +30,32 @@ update_host_keepphylo <- function(hostID) {
   p <- pbe1$p
   v <- pbe1$v
   
-  ### propose the new infection time
-  tinf.prop <- v$nodetimes[hostID] - 
-    rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
+  
+  ### Propose infection times constraint by probability distribution of last-negative test (if available)
+  lastneg.time <- pbe1$d$last.negative[hostID]
+  
+  if(is.null(lastneg.time)){
+    ### Propose the new infection time
+    ### Infection time is proposed from a gamma distribution anchored at the first positive sample.
+    tinf.prop <- v$nodetimes[hostID] -
+      rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
+  }else{
+    shape <- p$sample.shape
+    scale <- p$sample.mean / shape
+    
+    ### Rejection sampling 
+    repeat{
+      tinf.cand <- v$nodetimes[hostID] - 
+        rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
+      
+      p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
+      if (runif(1) < p_accept){
+        tinf.prop <- tinf.cand
+        break
+      }
+    }
+  }
+
   copy2pbe1("tinf.prop", le)
   
   ### identify the focal host's infector
@@ -132,9 +155,30 @@ update_host_phylotrans <- function(hostID, which_protocol) {
   p <- pbe0$p
   v <- pbe0$v
   
-  ### propose the new infection time
-  tinf.prop <- v$nodetimes[hostID] -
-    rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
+  ### Propose infection times constraint by probability distribution of last-negative test (if available)
+  lastneg.time <- pbe0$d$last.negative[hostID]
+  
+  if(is.null(lastneg.time)){
+    ### Propose the new infection time
+    ### Infection time is proposed from a gamma distribution anchored at the first positive sample.
+    tinf.prop <- v$nodetimes[hostID] -
+      rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
+  }else{
+    shape <- p$sample.shape
+    scale <- p$sample.mean / shape
+
+    ### Rejection sampling 
+    repeat{
+      tinf.cand <- v$nodetimes[hostID] -
+        rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
+      
+      p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
+      if (runif(1) < p_accept){
+        tinf.prop <- tinf.cand
+        break
+      }
+    }
+  }
   # tinf.prop <- v$inftimes[hostID] + rnorm(1, 0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape))
   # tinf.prop <- min(tinf.prop, 2 * v$nodetimes[hostID] - tinf.prop)
   if (!is.null(d$admission.times))
@@ -194,10 +238,31 @@ update_host_history <- function(hostID, which_protocol) {
   p <- pbe0$p
   v <- pbe0$v
   
-  ### propose the new infection time
-  tinf.prop <- v$nodetimes[hostID] -
-    rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
+  ### Propose infection times constraint by probability distribution of last-negative test (if available)
+  lastneg.time <- pbe0$d$last.negative[hostID]
   
+  if(is.null(lastneg.time)){
+    ### Propose the new infection time
+    ### Infection time is proposed from a gamma distribution anchored at the first positive sample.
+    tinf.prop <- v$nodetimes[hostID] -
+      rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
+  }else{
+    shape <- p$sample.shape
+    scale <- p$sample.mean / shape
+
+    ### Rejection sampling 
+    repeat{
+      tinf.cand <- v$nodetimes[hostID] -
+        rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
+      
+      p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
+      if (runif(1) < p_accept){
+        tinf.prop <- tinf.cand
+        break
+      }
+    }
+  }
+
   #if (!is.null(d$admission.times) & hostID != 0)
   #  if (tinf.prop < d$admission.times[hostID]) return()
   copy2pbe1("tinf.prop", le)

@@ -38,6 +38,8 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
                             verbose = 1, historydist = 0.5,
                             nchains = 1, heats = NULL, all_chains = FALSE, parallel = FALSE, shiny = FALSE, ...) {
   
+  # --- PARALLEL SAMPLING HANDLING ---
+  # If parallel sampling is requested, delegate to separate function and exit.
   if (parallel)
     return(sample_phybreak_parallel(x, nsample, thin, thinswap, classic, keepphylo, withinhost_only, 
                                     parameter_frequency, status_interval, 
@@ -46,13 +48,17 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
   ### tests
   if(nsample < 1) stop("nsample should be positive")
   if(thin < 1) stop("thin should be positive")
+  
+  # Ensure within-host bottleneck parameter is set
   if(is.null(x$p$wh.bottleneck)) {
     x$p$wh.bottleneck <- choose_whbottleneck("auto", x$p$wh.model)
   }
+  # Sanity checks for update protocol proportions
   if(classic < 0 | classic > 1) stop("classic should be a fraction")
   if(keepphylo < 0 | keepphylo > 1) stop("keepphylo should be a fraction")
   if(withinhost_only < 0 | withinhost_only > 1) stop("withinhost_only should be a fraction")
   if(withinhost_only + keepphylo + classic > 1) stop("classic + keepphylo + withinhost_only should be a fraction")
+  # If keepphylo is incompatible with model, disable it with a warning.
   if(keepphylo > 0) {
     if(any(duplicated(x$d$hostnames)) || !(x$p$wh.model %in% c(3, "linear")) || x$p$wh.bottleneck == "wide") {
       keepphylo <- 0
@@ -60,9 +66,14 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
     } 
   }
   
+  
+  ### --- MODULE INITIALIZATION ---
+  # Attach optional modeling modules (distance, spatial, etc.) if needed.
   #le <- environment()
   x <- add_modules_to_phybreak(x, phyb.obj = FALSE, ...)
   
+  # --- HISTORY-DIST UPDATE HANDLING ---
+  # Only enable historydist if multi-introduction model is used.
   if(!x$p$mult.intro & historydist > 0) {
     historydist <- 0
   }
@@ -73,6 +84,8 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
   else if (!inherits(heats, "numeric"))
     stop("heats is not a numeric vector")
   
+  # --- VERBOSITY OPTIONS ---
+  # Set print/display options based on verbosity level.
   ### WHY NOT printmessage AND printlog AS INPUT?
   if(verbose == 1){
     printmessage = TRUE
@@ -144,12 +157,14 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
   # }
   #     
   s.posts <- lapply(1:nchains, function(i) s.post)
-    
+  
+  # --- INITIALIZE MCMC ENVIRONMENTS ---  
   build_pbe(x)
   
   envirs <- list()
   npars <- sum(grepl("est", names(x$h)))
   
+  # For each chain, create a separate environment, initializing heat and chain index.
   for (n in 1:nchains){
     heat <- heats[n]
     copy2pbe0("heat", environment())
@@ -158,6 +173,7 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
     envirs[[n]] <- as.environment(as.list(pbe0, all.names = TRUE))
   }
   
+  # --- INITIAL PROGRESS OUTPUT ---
   if (printmessage)   
     message(paste0("  sample      logLik  introductions       mu  gen.mean  sam.mean parsimony (nSNPs = ", pbe0$d$nSNPs, ")"))
   if (printlog)
@@ -195,6 +211,7 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
             update_host(i, which_protocol, history || i == 0)
           }
           
+          # Parameter updates for each estimated parameter
           if (i == -1 && x$h$est.mu) update_mu()
           if (i == -2 && x$h$est.mG) update_mG()
           if (i == -3 && x$h$est.mS) update_mS()
