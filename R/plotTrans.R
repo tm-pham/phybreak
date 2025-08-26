@@ -302,7 +302,7 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
     #widths <- abs(1 - (maxwd - dgamma(x0s - inftimes[i], shape = tgshape, scale = tgscale)) / maxwd)
     if(p$trans.model == "user"){
       widths <- sapply(x0s, function(x){
-        ifelse(x <= cultimes[i], infect_distribution(x, inftimes[i], lastneg.time = lastneg.times[i],
+        ifelse(x <= cultimes[i], infect_distribution(x, inftimes[i],
                                                      le = list(p = p, v = list(nodetimes = samtimes)),
                                                      nodetimes = samtimes), 0)
       })
@@ -310,14 +310,14 @@ maketransplot <- function(x, tg.mean = NA, tg.shape = NA, ttrans = NULL, mar = 0
     } else if (!is.null(cultimes)) {
       widths <- sapply(x0s, function(x){
         #if (x0s < adtimes[i]) return(0)
-        if (x <= cultimes[i]) return(infect_distribution(x, inftimes[i], lastneg.time = lastneg.times[i],
+        if (x <= cultimes[i]) return(infect_distribution(x, inftimes[i],
                                                      le = list(p = p, v = list(nodetimes = samtimes)),
                                                      nodetimes = samtimes))
         else return(0)
       })
       widths <- abs(1 - (maxwd - widths)/maxwd)
     } else {
-      widths <- abs(1 - (maxwd - infect_distribution(x0s, inftimes[i], lastneg.time = lastneg.times[i],
+      widths <- abs(1 - (maxwd - infect_distribution(x0s, inftimes[i], 
                                                    le = list(p = p, v = list(nodetimes = samtimes)),
                                                    nodetimes = samtimes)) / maxwd)
     }
