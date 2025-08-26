@@ -21,27 +21,22 @@ rewire_within_complete_edgewise <- function(ID, tinf) {
                                     tinf, pbe1$p)
   coaltimes_new <- coaltimes_new[coaltimes_new > tinf]
   
-  # if no valid coalescent times, return -Inf and reject move
-  if(length(coaltimes_new)==0){
+  pbe1$logLiktoporatio <- pbe1$logLiktoporatio - lik_topology_host(pbe1, ID)
+  coaltimes_new <- c(coaltimes_new)[rank(coaltimes_old)]
+  
+  pbe1$v$nodetimes[coalnodes] <- coaltimes_new
+  btnodes <- 2 * pbe0$d$nsamples + ID - 1
+  pbe1$v$nodetimes[btnodes] <- tinf
+  pbe1$v$inftimes[ID] <- tinf
+  
+  if(any(pbe1$v$nodetimes[pbe1$v$nodehosts == ID] - 
+         pbe1$v$nodetimes[pbe1$v$nodeparents[pbe1$v$nodehosts == ID]] < 0)) {
     pbe1$logLiktoporatio <- -Inf
     return()
-  }else{
-    pbe1$logLiktoporatio <- pbe1$logLiktoporatio - lik_topology_host(pbe1, ID)
-    coaltimes_new <- c(coaltimes_new)[rank(coaltimes_old)]
-    
-    pbe1$v$nodetimes[coalnodes] <- coaltimes_new
-    btnodes <- 2 * pbe0$d$nsamples + ID - 1
-    pbe1$v$nodetimes[btnodes] <- tinf
-    pbe1$v$inftimes[ID] <- tinf
-    
-    if(any(pbe1$v$nodetimes[pbe1$v$nodehosts == ID] - 
-           pbe1$v$nodetimes[pbe1$v$nodeparents[pbe1$v$nodehosts == ID]] < 0)) {
-      pbe1$logLiktoporatio <- -Inf
-      return()
-    } 
-    
-    pbe1$logLiktoporatio <- pbe1$logLiktoporatio + lik_topology_host(pbe1, ID)
-  }
+  } 
+  
+  pbe1$logLiktoporatio <- pbe1$logLiktoporatio + lik_topology_host(pbe1, ID)
+
 }
 
 rewire_pathA_complete_edgewise <- function() {
