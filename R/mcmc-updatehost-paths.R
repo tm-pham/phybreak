@@ -34,7 +34,7 @@ update_host_keepphylo <- function(hostID) {
   ### Propose infection times constraint by probability distribution of last-negative test (if available)
   lastneg.time <- pbe1$d$last.negative[hostID]
   
-  if(is.null(lastneg.time)){
+  if(length(lastneg.time)==0){
     ### Propose the new infection time
     ### Infection time is proposed from a gamma distribution anchored at the first positive sample.
     tinf.prop <- v$nodetimes[hostID] -
@@ -248,7 +248,7 @@ update_host_history <- function(hostID, which_protocol) {
   ### Propose infection times constraint by probability distribution of last-negative test (if available)
   lastneg.time <- pbe0$d$last.negative[hostID]
   
-  if(is.null(lastneg.time)){
+  if(length(lastneg.time)==0){
     ### Propose the new infection time
     ### Infection time is proposed from a gamma distribution anchored at the first positive sample.
     tinf.prop <- v$nodetimes[hostID] -
