@@ -164,8 +164,8 @@ update_host_phylotrans <- function(hostID, which_protocol) {
     tinf.prop <- v$nodetimes[hostID] -
       rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
   }else{
-    shape <- p$sample.shape
-    scale <- p$sample.mean / shape
+    shape <- pbe0$p$sample.shape
+    scale <- pbe0$p$sample.mean / shape
 
     ### Rejection sampling 
     repeat{
@@ -173,6 +173,7 @@ update_host_phylotrans <- function(hostID, which_protocol) {
         rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
       
       p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
+      cat("p_accept:", p_accept, "\n")
       if (runif(1) < p_accept){
         tinf.prop <- tinf.cand
         break
