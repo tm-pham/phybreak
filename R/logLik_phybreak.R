@@ -78,7 +78,6 @@ lik_gentimes <- function(le){
   v <- le$v
   indices <- v$infectors == 0
   othercases <- v$infectors > 0
-  lastneg.times <- le$d$last.negative[othercases]
   
   intro.rate <- ifelse(is.null(p$intro.rate), 1, p$intro.rate)
   R <- ifelse(is.null(p$R), 1, p$R)
@@ -92,7 +91,7 @@ lik_gentimes <- function(le){
     return(L)
   else
     return( L +
-            sum(log(R) + infect_distribution(time = v$inftimes[othercases], lastneg.time = lastneg.times,
+            sum(log(R) + infect_distribution(time = v$inftimes[othercases],
                                              inftimes = v$inftimes[v$infectors[othercases]],
                                              nodetimes = v$nodetimes[v$nodetypes=="s"][v$infectors[othercases]],
                                              le = le, log = TRUE)))

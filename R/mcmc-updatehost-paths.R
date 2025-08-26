@@ -324,10 +324,9 @@ update_host_history <- function(hostID, which_protocol) {
     v <- pbe0$v
     hostID <- pbe1$hostID
     tinf.prop <- pbe1$tinf.prop
-    lastneg.time <- pbe1$d$last.negative[hostID]
     
     ### propose infector for hostID
-    infect.dist <- infect_distribution(tinf.prop, lastneg.time = lastneg.time, 
+    infect.dist <- infect_distribution(tinf.prop,
                                        v$inftimes, list(d = d, p = p, v = v),
                                        nodetimes = v$nodetimes[v$nodetypes=="s"])
     dens.infectorproposal <- infect.dist +
@@ -428,13 +427,12 @@ update_host_history <- function(hostID, which_protocol) {
     v <- pbe0$v
     hostID <- pbe1$hostID
     tinf.prop <- pbe1$tinf.prop
-    lastneg.time <- pbe1$d$last.negative[hostID]
     
     ### calculate proposal ratio 
     # the reverse proposal includes proposing an infector, 
     # so first identify the current infector
     infector.current.ID <- v$infectors[hostID]
-    infect.dist <- infect_distribution(v$inftimes[hostID], lastneg.time = lastneg.time,
+    infect.dist <- infect_distribution(v$inftimes[hostID],
                                        v$inftimes, list(d = d, p = p, v = v),
                                        nodetimes = v$nodetimes[v$nodetypes=="s"])
     dens.infectorcurrent <- infect.dist +
@@ -476,11 +474,10 @@ update_host_history <- function(hostID, which_protocol) {
     v <- pbe0$v
     hostID <- pbe1$hostID
     tinf.prop <- pbe1$tinf.prop
-    lastneg.time <- pbe1$d$last.negative[hostID]
     
     ### identify the current infector and propose the new infector
     infector.current.ID <- v$infectors[hostID]
-    infect.dist <- infect_distribution(tinf.prop, lastneg.time = lastneg.time,
+    infect.dist <- infect_distribution(tinf.prop, 
                                        v$inftimes, list(d =d, p = p, v = v),
                                        nodetimes = v$nodetimes[v$nodetypes=="s"])
     dens.infectorproposal <- infect.dist +
@@ -612,13 +609,12 @@ update_host_history <- function(hostID, which_protocol) {
     d <- pbe0$d
     hostID <- pbe1$hostID
     tinf.prop <- pbe1$tinf.prop
-    lastneg.time <- pbe1$d$last.negative[hostID]
     
     ### identify the current infector and propose the new infector
     infector.current.ID <- v$infectors[hostID]
     if (infector.current.ID == 0) infector.current.ID <- p$obs+1
     
-    infect.dist <- infect_distribution(tinf.prop, lastneg.time = lastneg.time,
+    infect.dist <- infect_distribution(tinf.prop,
                                        v$inftimes, list(d = d, p = p, v = v),
                                        nodetimes = v$nodetimes[v$nodetypes=="s"])
     #print(infect.dist)                                   

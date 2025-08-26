@@ -18,7 +18,6 @@
 #' 
 #' @export
 infect_distribution <- function(time, inftimes, le, 
-                                lastneg.time = NULL, 
                                 nodetimes = NULL,  
                                 host = NULL, log = FALSE){
   
@@ -27,7 +26,6 @@ infect_distribution <- function(time, inftimes, le,
   
   if(trans.model == "gamma") {
     if(is.null(le$d$removal.times)){
-    
       if(log)
         prob <- dgamma(time - inftimes, 
                       shape = le$p$gen.shape, 
@@ -50,7 +48,6 @@ infect_distribution <- function(time, inftimes, le,
     # inf_func <- le$p$inf_function
     prob <- le$p$inf_function(time, inftimes, le, nodetimes, host, log)
     return(prob)
-
   }
   
 
