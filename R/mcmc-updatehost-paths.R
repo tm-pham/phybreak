@@ -48,11 +48,7 @@ update_host_keepphylo <- function(hostID) {
       tinf.cand <- v$nodetimes[hostID] - 
         rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
       
-      cat("lastneg.time:", lastneg.time, "\n")
-      cat("tinf.cand:", tinf.cand, "\n")
-      
       p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
-      cat("p_accept:", p_accept, "\n")
       if (runif(1) < p_accept){
         tinf.prop <- tinf.cand
         break
@@ -175,11 +171,8 @@ update_host_phylotrans <- function(hostID, which_protocol) {
     repeat{
       tinf.cand <- v$nodetimes[hostID] -
         rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
-      cat("lastneg.time:", lastneg.time, "\n")
-      cat("tinf.cand:", tinf.cand, "\n")
       
       p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
-      cat("p_accept:", p_accept, "\n")
       if (runif(1) < p_accept){
         tinf.prop <- tinf.cand
         break
