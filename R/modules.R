@@ -121,8 +121,11 @@ introductions_functions <- function(le){
       dgamma(pbe0$p$wh.history, shape = h$wh.h.sh, scale = h$wh.h.av/h$wh.h.sh, log = TRUE)
     
     ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("wh.history")
+    # Only execute if logaccprob is not NA, NaN, or Inf
+    if (!is.na(logaccprob) && !is.nan(logaccprob) && !is.infinite(logaccprob)) {
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("wh.history")
+      }
     }
   }
   le$updaters[["update_ir"]] <- function() {
@@ -155,8 +158,11 @@ introductions_functions <- function(le){
       dgamma(pbe0$p$intro.rate, shape = h$ir.sh, scale = h$ir.av/h$ir.sh, log = TRUE)
     
     ### accept
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("ir")
+    # Only execute if logaccprob is not NA, NaN, or Inf
+    if (!is.na(logaccprob) && !is.nan(logaccprob) && !is.infinite(logaccprob)) {
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("ir")
+      }
     }
   }
 
@@ -188,8 +194,11 @@ introductions_functions <- function(le){
     logaccprob <- pbe1$logLikgen - pbe0$logLikgen + logproposalratio
     
     ### accept
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("R")
+    # Only execute if logaccprob is not NA, NaN, or Inf
+    if (!is.na(logaccprob) && !is.nan(logaccprob) && !is.infinite(logaccprob)) {
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("R")
+      }
     }
   }
   
@@ -311,8 +320,11 @@ spatial_functions <- function(le){
       dgamma(pbe0$p$dist.exponent - 1, shape = h$dist.e.sh, scale = h$dist.e.av/h$dist.e.sh, log = TRUE)
     
     ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("dist.exponent")
+    # Only execute if logaccprob is not NA, NaN, or Inf
+    if (!is.na(logaccprob) && !is.nan(logaccprob) && !is.infinite(logaccprob)) {
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("dist.exponent")
+      }
     }
   }
   le$updaters[["update_dist_scale"]] <- function() {
@@ -343,8 +355,11 @@ spatial_functions <- function(le){
       dgamma(pbe0$p$dist.scale, shape = h$dist.s.sh, scale = h$dist.s.av/h$dist.s.sh, log = TRUE)
     
     ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("dist.scale")
+    # Only execute if logaccprob is not NA, NaN, or Inf
+    if (!is.na(logaccprob) && !is.nan(logaccprob) && !is.infinite(logaccprob)) {
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("dist.scale")
+      }
     }
   }
   le$updaters[["update_dist_mean"]] <- function() {
@@ -375,8 +390,11 @@ spatial_functions <- function(le){
       dgamma(pbe0$p$dist.mean, shape = h$dist.m.sh, scale = h$dist.m.av/h$dist.m.sh, log = TRUE)
     
     ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("dist.mean")
+    # Only execute if logaccprob is not NA, NaN, or Inf
+    if (!is.na(logaccprob) && !is.nan(logaccprob) && !is.infinite(logaccprob)) {
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("dist.mean")
+      }
     }
   }
   
@@ -532,8 +550,11 @@ contact_functions <- function(le){
       dbeta(pbe0$p$cnt.eta, shape1 = h$cnt.eta.alpha, shape2 = h$cnt.eta.beta, log = TRUE)
       
     ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("contact")
+    # Only execute if logaccprob is not NA, NaN, or Inf
+    if (!is.na(logaccprob) && !is.nan(logaccprob) && !is.infinite(logaccprob)) {
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("contact")
+      }
     }
   }
 
@@ -571,8 +592,11 @@ contact_functions <- function(le){
       dbeta(pbe0$p$cnt.lambda, shape1 = h$cnt.l.alpha, shape2 = h$cnt.l.beta, log = TRUE)
 
     ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("contact")
+    # Only execute if logaccprob is not NA, NaN, or Inf
+    if (!is.na(logaccprob) && !is.nan(logaccprob) && !is.infinite(logaccprob)) {
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("contact")
+      }
     }
   }
   
@@ -610,8 +634,11 @@ contact_functions <- function(le){
     
     
     ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("contact")
+    # Only execute if logaccprob is not NA, NaN, or Inf
+    if (!is.na(logaccprob) && !is.nan(logaccprob) && !is.infinite(logaccprob)) {
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("contact")
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 #include <Rcpp.h>
 using namespace Rcpp;
+#include <iostream>
 
 // Updating the log-likelihood and "likarray" of sequence data
 // given an existing "likarray" for a similar tree based on the same
@@ -78,9 +79,25 @@ double likseqenv(Environment pbenv,
             totprob += likarray[curnode * nSNPs * 4 + j * 4 + k];
           }
           for(int k = 0; k < 4; ++k) {
-            likarray[(nextnode * nSNPs + j) * 4 + k] *=
-              0.25 * totprob + (likarray[(curnode * nSNPs + j) * 4 + k] -
-              0.25 * totprob) * exp(-mu * edgelen);
+
+              double val = 0.25 * totprob +
+                          (likarray[(curnode * nSNPs + j) * 4 + k] - 0.25 * totprob) * std::exp(-mu * edgelen);
+              if (val < 0) {
+                if (val > -1e-3) val = 0.0; // numerical noise clamp
+                else {
+                  Rcpp::Rcout << "Negative likarray at node=" << (nextnode+1)
+                              << " snp=" << (j+1) << " nuc=" << k
+                              << " edgelen=" << edgelen << " value=" << val << "\n";
+                }
+              }
+              likarray[(nextnode * nSNPs + j) * 4 + k] *= val;
+
+            //likarray[(nextnode * nSNPs + j) * 4 + k] *=
+            //  0.25 * totprob + (likarray[(curnode * nSNPs + j) * 4 + k] -
+            //  0.25 * totprob) * exp(-mu * edgelen);
+              //if(likarray[(nextnode * nSNPs + j) * 4 + k] <0){
+              //  std::cout << "Negative likarray" << likarray[(nextnode * nSNPs + j) * 4 + k] << '\n';
+              //}
           }
         }
         curnode = nextnode;
@@ -94,13 +111,20 @@ double likseqenv(Environment pbenv,
     routefree[curnode] = true;
   }
   
-  
   for(int j = 0; j < nSNPs; ++j) {
     SNPsums[j] = 0.25 * likarray[(rootnode * nSNPs + j) * 4];
-    for(int k = 1; k < 4; ++k) {
+    int k; 
+    for(k = 1; k < 4; ++k) {
       SNPsums[j] += 0.25 * likarray[(rootnode * nSNPs + j) * 4 + k];
     }
+    double temp = SNPsums[j]; 
     SNPsums[j] = log(SNPsums[j]) * SNPfreqs[j];
+    if(std::isnan(SNPsums[j])){
+      std::cout << "likarray[(rootnode * nSNPs + j) * 4 + k] = " << likarray[(rootnode * nSNPs + j) * 4 + k] << '\n';
+      std::cout << "Before: SNPsums[j] = " << temp << '\n';
+      std::cout << "After: SNPsums[j] = " << SNPsums[j] << '\n';
+    }
+
   }
 
   result = SNPsums[0];

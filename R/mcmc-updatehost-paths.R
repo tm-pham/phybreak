@@ -31,10 +31,10 @@ update_host_keepphylo <- function(hostID) {
   v <- pbe1$v
   
   
-  ### Propose infection times constraint by probability distribution of last-negative test (if available)
-  lastneg.time <- pbe1$d$last.negative[hostID]
+  ### Propose infection times constraint by probability distribution of last-negative test (if available) 
+  lastneg.time <- pbe1$d$last.negative[hostID] 
   
-  if(length(lastneg.time)==0){
+  if(length(lastneg.time)==0 || is.na(lastneg.time)){
     ### Propose the new infection time
     ### Infection time is proposed from a gamma distribution anchored at the first positive sample.
     tinf.prop <- v$nodetimes[hostID] -
@@ -45,10 +45,19 @@ update_host_keepphylo <- function(hostID) {
     
     ### Rejection sampling 
     repeat{
+      # Candidate infection time
+      # tinf.cand ~ P(tinf | tinf < nodetime(hostID))
+      # => truncated gamma distribution 
+      # => sample from untruncated gamma 
+      # => equivalent to sampling from untruncated gamma and rejecting if tinf.cand < lastneg.time
       tinf.cand <- v$nodetimes[hostID] - 
         rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
       
+      # Calculate acceptance probability based on last-negative test
+      # P (test negative at lastneg.time | tinf = tinf.cand) = P (time to first positive > lastneg.time - tinf.cand) 
+      # = 1 - P (time to first positive <= lastneg.time - tinf.cand) = 1 - F (lastneg.time - tinf.cand)
       p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
+
       if (runif(1) < p_accept){
         tinf.prop <- tinf.cand
         break
@@ -158,7 +167,7 @@ update_host_phylotrans <- function(hostID, which_protocol) {
   ### Propose infection times constraint by probability distribution of last-negative test (if available)
   lastneg.time <- pbe0$d$last.negative[hostID]
   
-  if(is.null(lastneg.time)){
+  if(length(lastneg.time)==0 || is.na(lastneg.time)){
     ### Propose the new infection time
     ### Infection time is proposed from a gamma distribution anchored at the first positive sample.
     tinf.prop <- v$nodetimes[hostID] -
@@ -173,6 +182,7 @@ update_host_phylotrans <- function(hostID, which_protocol) {
         rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
       
       p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
+
       if (runif(1) < p_accept){
         tinf.prop <- tinf.cand
         break
@@ -241,7 +251,7 @@ update_host_history <- function(hostID, which_protocol) {
   ### Propose infection times constraint by probability distribution of last-negative test (if available)
   lastneg.time <- pbe0$d$last.negative[hostID]
   
-  if(length(lastneg.time)==0){
+  if(length(lastneg.time)==0 || is.na(lastneg.time)){
     ### Propose the new infection time
     ### Infection time is proposed from a gamma distribution anchored at the first positive sample.
     tinf.prop <- v$nodetimes[hostID] -
@@ -255,6 +265,7 @@ update_host_history <- function(hostID, which_protocol) {
       tinf.cand <- v$nodetimes[hostID] -
         rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
       p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
+
       if (runif(1) < p_accept){
         tinf.prop <- tinf.cand
         break
@@ -595,8 +606,11 @@ update_host_history <- function(hostID, which_protocol) {
     logaccprob <- pbe1$logLikseq - pbe0$logLikseq + logproposalratio
     
     ### accept or reject
-    if (runif(1) < exp(logaccprob)) {
-      accept_pbe("withinhost")
+    # Execute only if logaccprob is not NA, NaN, or Inf 
+    if (!is.na(logaccprob) && !is.nan(logaccprob) && !is.infinite(logaccprob)) {
+      if (runif(1) < exp(logaccprob)) {
+        accept_pbe("withinhost")
+      }
     }
   }
   
@@ -649,7 +663,7 @@ update_host_history <- function(hostID, which_protocol) {
       dgamma(v$nodetimes[hostID] - tinf.prop,
              shape = tinf.prop.shape.mult * p$sample.shape,
              scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)
-    
+
     if (infector.proposed.ID == p$obs+1) infector.proposed.ID <- 0
     else if (!is.null(d$admission.times)) {
       if (tinf.prop < d$admission.times[hostID]) return()
@@ -677,21 +691,24 @@ update_host_history <- function(hostID, which_protocol) {
   update_move <- function(rewirefunction, which_protocol) {
     prepare_pbe()
     do.call(rewirefunction, args = list())
-    
-    if(pbe1$logLiktoporatio > -Inf) {
+
+    if(pbe1$logLiktoporatio > -Inf && pbe1$logproposalratio > -Inf) {
       propose_pbe("phylotrans")
       logLiks <- setdiff(names(pbe0)[grepl("logLik", names(pbe0))], "logLikcoal")
       logacceptanceprob <- pbe0$heat * 
         (sum(sapply(logLiks, function(n) return(pbe1[[n]]))) + pbe1$logLiktoporatio -
            sum(sapply(logLiks, function(n) return(pbe0[[n]])))) + pbe1$logproposalratio
-      
-      if (runif(1) < exp(logacceptanceprob)) {
-        accept_pbe("phylotrans")
+
+      # Only execute this if logacceptanceprob is not NA, NaN, or Inf
+      if (!is.na(logacceptanceprob) && !is.nan(logacceptanceprob) && !is.infinite(logacceptanceprob)) {
+        if (runif(1) < exp(logacceptanceprob)) {
+          accept_pbe("phylotrans")
+        }
+
+        if(which_protocol == "edgewise") {
+          update_move_sampleedges()
+        }
       }
-    }
-    
-    if(which_protocol == "edgewise") {
-      update_move_sampleedges()
     }
   }
   

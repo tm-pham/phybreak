@@ -49,7 +49,11 @@ build_pbe <- function(phybreak.obj) {
   lik_func <- phybreak.obj$likelihoods
   SNP <- t(matrix(unlist(d$sequences), ncol = d$nsamples))
   SNPfr <- attr(d$sequences, "weight")
-  
+
+  if(inherits(d$last.negative, "Date")) {
+    d$last.negative <- as.numeric(d$last.negative - d$reference.date)
+    cat("d$last.negative converted to numeric:", d$last.negative, "\n")
+  }
   
   ### Jukes-Cantor: reduce diversity by naming each nucleotide by its frequency order, and grouping SNPs by same pattern across
   ### hosts
@@ -103,8 +107,52 @@ build_pbe <- function(phybreak.obj) {
   
   ### change the variables slot to an environmental variables slot (with transmission nodes in the tree)
   v <- phybreak2environment(v)
-  
-  ### complete likarray and calculate log-likelihood of sequences
+
+  ### --------- Adjusting coalescent nodes --------- ###
+  # Ensure each coalescent node is older than its descendant tips
+  ns <- d$nsamples
+  N <- 2 * ns - 1
+  adjusted <- 0L
+  eps <- 1e-6
+  for (i in (ns + 1):N) {  # coalescent nodes in 1..N
+    # find min tip time among descendants of i
+    min_tip <- Inf
+    for (t in 1:ns) {
+      node <- t
+      while (node != 0 && node != i) {
+        node <- v$nodeparents[node]
+      }
+      if (node == i) {
+        if (v$nodetimes[t] < min_tip) min_tip <- v$nodetimes[t]
+      }
+    }
+    if (is.finite(min_tip) && v$nodetimes[i] >= min_tip) {
+      v$nodetimes[i] <- min_tip - eps
+      adjusted <- adjusted + 1L
+    }
+  }
+  if (adjusted > 0) cat("Adjusted", adjusted, "coalescent node times to be older than descendant tips\n")
+
+  # Optional: sanity check of total path lengths tip -> first coalescent
+  for (t in 1:ns) {
+    # find the first coalescent ancestor of tip t
+    curnode <- t
+    anc <- v$nodeparents[curnode]
+    while (!is.na(anc) && anc > 0 && v$nodetypes[anc] != "c") {
+      anc <- v$nodeparents[anc]
+    }
+    if (is.na(anc) || anc == 0) {
+      # cat("NOTE: tip", t, "has no coalescent ancestor under root; skipping check\n")
+      next
+    }
+    edgelen <- v$nodetimes[t] - v$nodetimes[anc]
+    # cat("Edge length (tip", t, "-> first coalescent", anc, "):", edgelen, "\n")
+    if (isTRUE(edgelen <= 0)) {
+      cat("WARNING: non-positive total edge length from tip", t, "to coalescent", anc, ":", edgelen, "\n")
+    }
+  }
+  ### ----------------------------------------------- ###
+
   .likseqenv(le, (d$nsamples + 1):(2 * d$nsamples - 1), 1:d$nsamples)
   
   ### initialize all dimensions of contactarray
@@ -130,25 +178,35 @@ build_pbe <- function(phybreak.obj) {
 
 
   ### calculate the other log-likelihoods
-  if(inherits(d$last.negative, "Date")) {
-    d$last.negative <- as.numeric(d$last.negative - d$reference.date)
+  if(is.nan(logLikseq) || is.infinite(logLikseq)) {
+    cat("\n!!! ERROR: logLikseq is invalid after .likseqenv !!!\n")
+    logLikseq <- -Inf
+    pbe0$logLikseq <- -Inf
+    pbe1$logLikseq <- -Inf
+    # Set other likelihoods to -Inf too
+    logLiksam <- -Inf
+    logLikgen <- -Inf
+    logLikcoal <- -Inf
+    
+  }else{
+    logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes)
+    logLikgen <- lik_gentimes(le)
+    logLikcoal <- lik_coaltimes(le)
   }
-  logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes)
-  logLikgen <- lik_gentimes(le)
-  logLikcoal <- lik_coaltimes(le)
 
   if(length(lik_func) > 0){
     for(n in names(lik_func)){
-      assign(n, lik_func[[n]](le))
-      copy2pbe0(n, le)
+        assign(n, lik_func[[n]](le))
+        copy2pbe0(n, le)
     }
   }
+
   
   # logLikdist <- lik_distances(p$dist.model, p$dist.exponent, p$dist.scale, p$dist.mean, 
   #                             v$infectors, d$distances, d$area)
   # logLikcontact <- lik_contact(v$infectors, d$contact.matrix, p$cnt.invest.trans, p$cnt.invest.nontrans,
   #                              p$cnt.rep, p$cnt.rep.false)
-  
+
   ### copy everything into pbe0
   copy2pbe0("d", le)
   copy2pbe0("h", le)
@@ -188,6 +246,11 @@ prepare_pbe <- function() {
   pbe1$contactarray <- pbe0$contactarray + 0 # make a true copy, not a pointer
   pbe1$logLikseq <- pbe0$logLikseq + 0 #make a true copy, not a pointer
   pbe1$logLiktoporatio <- 0
+
+  if(is.na(pbe1$logLikseq) || is.nan(pbe1$logLikseq) || is.infinite(pbe1$logLikseq)){
+    cat("Warning: pbe1$logLikseq is invalid after prepare_pbe!\n")
+    stop()
+  }
 }
 
 
@@ -225,6 +288,7 @@ propose_pbe <- function(f) {
   }
     
   if (!is.null(chnodes)) {
+
     .likseqenv(pbe1, chnodes, nodetips)
 
     if (p$contact == TRUE){
@@ -250,6 +314,9 @@ propose_pbe <- function(f) {
   
   if (f == "phylotrans" || f == "trans" || f == "mG" || f == "ir" || f == "R") {
     logLikgen <- lik_gentimes(le)
+    if(is.infinite(logLikgen) || is.nan(logLikgen) || is.na(logLikgen)){
+      cat("logLikgen is invalid!\n")
+    }
     copy2pbe1("logLikgen", le)
   }
   
@@ -258,6 +325,9 @@ propose_pbe <- function(f) {
       d$last.negative <- as.numeric(d$last.negative - d$reference.date)
     }
     logLiksam <- lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes)
+    if(is.infinite(logLiksam) || is.nan(logLiksam) || is.na(logLiksam)){
+      cat("logLiksam is invalid!\n")
+    }
     copy2pbe1("logLiksam", le)
   }
   

@@ -35,8 +35,11 @@ swap_heats <- function(heats, likelihood){#, heats, pbe_j, pbe_k){
   else
     logacceptanceprob <- (heatk - heatj)*(Lj - Lk)
 
-  if (runif(1) < exp(logacceptanceprob)) {
-    heats[proposed_swap] <- heats[rev(proposed_swap)]
+  # Only attempt swap if logacceptanceprob is not NA, NaN, or Inf
+  if (!is.na(logacceptanceprob) && !is.nan(logacceptanceprob) && !is.infinite(logacceptanceprob)) {
+    if (runif(1) < exp(logacceptanceprob)) {
+      heats[proposed_swap] <- heats[rev(proposed_swap)]
+    }
   }
   
   return(heats)
