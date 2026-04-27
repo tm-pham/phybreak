@@ -1,7 +1,57 @@
-### functions exclusively involved in updating the tree, i.e. proposing an infection time and infector, 
+### functions exclusively involved in updating the tree, i.e. proposing an infection time and infector,
 ### and accepting or rejecting the proposal. The actual change in tree topology is done in the 'rewire_' functions.
 ### fixed parameters
 tinf.prop.shape.mult <- 2/3  #shape for proposing infection time is sample.shape * tinf.prop.shape.mult
+
+### Maximum tries before giving up on the last-negative rejection sampler.
+### Returns NA on exhaustion; callers must treat NA as "abort proposal".
+tinf.lastneg.maxtries <- 1000
+
+### Propose tinf for hostID. If d$last.negative[hostID] is set, use rejection
+### sampling so the candidate is consistent with a negative test at lastneg.time.
+###
+### Note on shapes (intentional asymmetry):
+###   * Proposal Gamma uses shape = tinf.prop.shape.mult * p$sample.shape (= 2/3 *
+###     sample.shape) -- wider than the sample-time distribution, for exploration.
+###   * Acceptance weight uses the *full* p$sample.shape, because s(tinf) is the
+###     true sampling-distribution survival function P(T_sample > lastneg - tinf).
+### Detailed balance is restored by lastneg_logratio_correction() at every
+### call site.
+###
+### Returns: scalar tinf.prop, or NA if rejection sampling was exhausted.
+propose_tinf_lastneg <- function(hostID, p, v, d) {
+  shape.prop <- tinf.prop.shape.mult * p$sample.shape
+  scale.prop <- p$sample.mean / shape.prop
+  nodetime   <- v$nodetimes[hostID]
+
+  lastneg.time <- d$last.negative[hostID]
+  if (length(lastneg.time) == 0 || is.na(lastneg.time)) {
+    return(nodetime - rgamma(1, shape = shape.prop, scale = scale.prop))
+  }
+
+  shape.full <- p$sample.shape
+  scale.full <- p$sample.mean / shape.full
+  for (i in seq_len(tinf.lastneg.maxtries)) {
+    tinf.cand <- nodetime - rgamma(1, shape = shape.prop, scale = scale.prop)
+    p.accept  <- 1 - pgamma(lastneg.time - tinf.cand,
+                            shape = shape.full, scale = scale.full)
+    if (runif(1) < p.accept) return(tinf.cand)
+  }
+  warning("propose_tinf_lastneg: max tries exhausted for host ", hostID)
+  return(NA_real_)
+}
+
+### log[ s(tinf_old) / s(tinf_new) ] where s(t) = 1 - pgamma(lastneg - t; full shape).
+### Returns 0 if no last-negative is set for hostID. Add this to logproposalratio
+### at every path that uses propose_tinf_lastneg() to restore detailed balance.
+lastneg_logratio_correction <- function(hostID, tinf_old, tinf_new, p, d) {
+  lastneg.time <- d$last.negative[hostID]
+  if (length(lastneg.time) == 0 || is.na(lastneg.time)) return(0)
+  shape.full <- p$sample.shape
+  scale.full <- p$sample.mean / shape.full
+  log(1 - pgamma(lastneg.time - tinf_old, shape = shape.full, scale = scale.full)) -
+    log(1 - pgamma(lastneg.time - tinf_new, shape = shape.full, scale = scale.full))
+}
 
 ### fork to the requested update protocol
 update_host <- function(hostID, which_protocol, history) {
@@ -31,39 +81,11 @@ update_host_keepphylo <- function(hostID) {
   v <- pbe1$v
   
   
-  ### Propose infection times constraint by probability distribution of last-negative test (if available) 
-  lastneg.time <- pbe1$d$last.negative[hostID] 
-  
-  if(length(lastneg.time)==0 || is.na(lastneg.time)){
-    ### Propose the new infection time
-    ### Infection time is proposed from a gamma distribution anchored at the first positive sample.
-    tinf.prop <- v$nodetimes[hostID] -
-      rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
-  }else{
-    shape <- p$sample.shape
-    scale <- p$sample.mean / shape
-    
-    ### Rejection sampling 
-    repeat{
-      # Candidate infection time
-      # tinf.cand ~ P(tinf | tinf < nodetime(hostID))
-      # => truncated gamma distribution 
-      # => sample from untruncated gamma 
-      # => equivalent to sampling from untruncated gamma and rejecting if tinf.cand < lastneg.time
-      tinf.cand <- v$nodetimes[hostID] - 
-        rgamma(1, shape = tinf.prop.shape.mult * pbe1$p$sample.shape, scale = pbe1$p$sample.mean/(tinf.prop.shape.mult * pbe1$p$sample.shape))
-      
-      # Calculate acceptance probability based on last-negative test
-      # P (test negative at lastneg.time | tinf = tinf.cand) = P (time to first positive > lastneg.time - tinf.cand) 
-      # = 1 - P (time to first positive <= lastneg.time - tinf.cand) = 1 - F (lastneg.time - tinf.cand)
-      p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
-
-      if (runif(1) < p_accept){
-        tinf.prop <- tinf.cand
-        break
-      }
-    }
-  }
+  ### Propose infection time. If d$last.negative[hostID] is set, propose_tinf_lastneg
+  ### conditions on a negative test there; the corresponding MH proposal-ratio
+  ### correction is applied in path G/H/I/J via lastneg_logratio_correction().
+  tinf.prop <- propose_tinf_lastneg(hostID, p, v, pbe1$d)
+  if (is.na(tinf.prop)) return()
 
   copy2pbe1("tinf.prop", le)
   
@@ -164,33 +186,11 @@ update_host_phylotrans <- function(hostID, which_protocol) {
   p <- pbe0$p
   v <- pbe0$v
   
-  ### Propose infection times constraint by probability distribution of last-negative test (if available)
-  lastneg.time <- pbe0$d$last.negative[hostID]
-  
-  if(length(lastneg.time)==0 || is.na(lastneg.time)){
-    ### Propose the new infection time
-    ### Infection time is proposed from a gamma distribution anchored at the first positive sample.
-    tinf.prop <- v$nodetimes[hostID] -
-      rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
-  }else{
-    shape <- pbe0$p$sample.shape
-    scale <- pbe0$p$sample.mean / shape
-
-    ### Rejection sampling 
-    repeat{
-      tinf.cand <- v$nodetimes[hostID] -
-        rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
-      
-      p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
-
-      if (runif(1) < p_accept){
-        tinf.prop <- tinf.cand
-        break
-      }
-    }
-  }
-  # tinf.prop <- v$inftimes[hostID] + rnorm(1, 0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape))
-  # tinf.prop <- min(tinf.prop, 2 * v$nodetimes[hostID] - tinf.prop)
+  ### Propose infection time. If d$last.negative[hostID] is set, propose_tinf_lastneg
+  ### conditions on a negative test there; the corresponding MH proposal-ratio
+  ### correction is applied in path A/B/D/E via lastneg_logratio_correction().
+  tinf.prop <- propose_tinf_lastneg(hostID, p, v, d)
+  if (is.na(tinf.prop)) return()
   if (!is.null(d$admission.times))
     if (tinf.prop < d$admission.times[hostID]) return()
   copy2pbe1("tinf.prop", le)
@@ -241,52 +241,38 @@ update_host_phylotrans <- function(hostID, which_protocol) {
 update_host_history <- function(hostID, which_protocol) {
   ### create an up-to-date proposal-environment with hostID as focal host
   copy2pbe1("hostID", environment())
-  
+
   ### making variables and parameters available within the function
   le <- environment()
   d <- pbe0$d
   p <- pbe0$p
   v <- pbe0$v
-  
-  ### Propose infection times constraint by probability distribution of last-negative test (if available)
-  lastneg.time <- pbe0$d$last.negative[hostID]
-  
-  if(length(lastneg.time)==0 || is.na(lastneg.time)){
-    ### Propose the new infection time
-    ### Infection time is proposed from a gamma distribution anchored at the first positive sample.
-    tinf.prop <- v$nodetimes[hostID] -
-      rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
-  }else{
-    shape <- p$sample.shape
-    scale <- p$sample.mean / shape
 
-    ### Rejection sampling 
-    repeat{
-      tinf.cand <- v$nodetimes[hostID] -
-        rgamma(1, shape = tinf.prop.shape.mult * pbe0$p$sample.shape, scale = pbe0$p$sample.mean/(tinf.prop.shape.mult * pbe0$p$sample.shape))
-      p_accept <- 1 - pgamma(lastneg.time - tinf.cand, shape=shape, scale=scale)
-
-      if (runif(1) < p_accept){
-        tinf.prop <- tinf.cand
-        break
-      }
-    }
+  # The history host (hostID == 0) is unsampled, so it has no nodetime and the
+  # downstream update_historyhost() does not use tinf.prop. Dispatch directly
+  # to avoid calling propose_tinf_lastneg() with hostID=0, which would index
+  # v$nodetimes[0] -> numeric(0) and trip the is.na() check below on a
+  # zero-length value.
+  if (hostID == 0) {
+    update_historyhost()
+    return(invisible())
   }
+
+  ### Propose infection time. If d$last.negative[hostID] is set, propose_tinf_lastneg
+  ### conditions on a negative test there; the corresponding MH proposal-ratio
+  ### correction is applied in path L via lastneg_logratio_correction().
+  tinf.prop <- propose_tinf_lastneg(hostID, p, v, d)
+  if (is.na(tinf.prop)) return()
 
   #if (!is.null(d$admission.times) & hostID != 0)
   #  if (tinf.prop < d$admission.times[hostID]) return()
   copy2pbe1("tinf.prop", le)
-  
+
   ### going down the decision tree
-  if (hostID == 0) {
-    # Y (hostID is history)
-    update_historyhost()
-  } else {
-    # N (hostID is not history)
-    if (tinf.prop < min(c(v$inftimes[v$infectors == hostID], Inf))) {
-      # NY (... & tinf.prop before hostID's first transmission node)
-      update_pathL(which_protocol)
-    }
+  # N (hostID is not history)
+  if (tinf.prop < min(c(v$inftimes[v$infectors == hostID], Inf))) {
+    # NY (... & tinf.prop before hostID's first transmission node)
+    update_pathL(which_protocol)
   }
 }
 
@@ -294,12 +280,13 @@ update_host_history <- function(hostID, which_protocol) {
   ### update if hostID is index and tinf.prop is before the first secondary case
   update_pathA <- function(which_protocol) {
     ### Make input locally available
+    d <- pbe0$d
     p <- pbe0$p
     v <- pbe0$v
     hostID <- pbe1$hostID
-    
+
     tinf.prop <- pbe1$tinf.prop
-    
+
     ### calculate proposal ratio
     # logproposalratio <- 0
     logproposalratio <- dgamma(v$nodetimes[hostID] - v$inftimes[hostID],
@@ -307,7 +294,8 @@ update_host_history <- function(hostID, which_protocol) {
                                scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) -
       dgamma(v$nodetimes[hostID] - tinf.prop,
              shape = tinf.prop.shape.mult * p$sample.shape,
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) +
+      lastneg_logratio_correction(hostID, v$inftimes[hostID], tinf.prop, p, d)
     copy2pbe1("logproposalratio", environment())
     
     ### propose minitrees and accept or reject
@@ -350,16 +338,17 @@ update_host_history <- function(hostID, which_protocol) {
     copy2pbe1("infector.proposed.ID", environment())
     
     ### calculate proposal ratio
-    # logproposalratio <- log(sum(dens.infectorproposal)/(dens.infectorproposal[infector.proposed.ID])) 
+    # logproposalratio <- log(sum(dens.infectorproposal)/(dens.infectorproposal[infector.proposed.ID]))
     logproposalratio <- log(sum(dens.infectorproposal)/(dens.infectorproposal[infector.proposed.ID])) +
       dgamma(v$nodetimes[hostID] - v$inftimes[hostID],
              shape = tinf.prop.shape.mult * p$sample.shape,
              scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) -
       dgamma(v$nodetimes[hostID] - tinf.prop,
              shape = tinf.prop.shape.mult * p$sample.shape,
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) +
+      lastneg_logratio_correction(hostID, v$inftimes[hostID], tinf.prop, p, d)
     copy2pbe1("logproposalratio", environment())
-    
+
     ### propose minitrees and accept or reject
     if(which_protocol == "classic") {
       if(p$wh.bottleneck == "complete") {
@@ -404,12 +393,15 @@ update_host_history <- function(hostID, which_protocol) {
     #         0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape)) +
     #   pnorm(v$inftimes[hostID] - v$nodetimes[hostID] - sampleinterval.hostID, 
     #         0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape))
+    # TODO(last.negative): MH correction for path C not yet derived under the
+    # index-swap; tinf.prop here is not directly hostID's post-acceptance inftime.
+    # Acceptable when last.negative is unset for hostID; biased otherwise.
     logproposalratio <- pgamma(sampleinterval.newindex, shape = tinf.prop.shape.mult * p$sample.shape,
                                scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log.p = TRUE) -
       pgamma(sampleinterval.hostID, shape = tinf.prop.shape.mult * p$sample.shape,
              scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log.p = TRUE)
     copy2pbe1("logproposalratio", environment())
-    
+
     ### propose minitrees and accept or reject
     if(logproposalratio > -Inf) {
       ### propose minitrees and accept or reject
@@ -427,8 +419,8 @@ update_host_history <- function(hostID, which_protocol) {
       update_move(rewire_function, which_protocol)
     }
   }
-  
-  
+
+
   ### update if hostID is not index and tinf.prop is before infection of the index case
   update_pathD <- function(which_protocol) {
     ### Make input locally available
@@ -450,16 +442,17 @@ update_host_history <- function(hostID, which_protocol) {
     dens.infectorcurrent[which(v$tree != v$tree[hostID] | infect.dist == 0)] <- 0
     dens.infectorcurrent[hostID] <- 0
     
-    # logproposalratio <- log(dens.infectorcurrent[infector.current.ID]/(sum(dens.infectorcurrent))) 
+    # logproposalratio <- log(dens.infectorcurrent[infector.current.ID]/(sum(dens.infectorcurrent)))
     logproposalratio <- log(dens.infectorcurrent[infector.current.ID]/(sum(dens.infectorcurrent))) +
       dgamma(v$nodetimes[hostID] - v$inftimes[hostID],
              shape = tinf.prop.shape.mult * p$sample.shape,
              scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) -
       dgamma(v$nodetimes[hostID] - tinf.prop,
              shape = tinf.prop.shape.mult * p$sample.shape,
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)    
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) +
+      lastneg_logratio_correction(hostID, v$inftimes[hostID], tinf.prop, p, d)
     copy2pbe1("logproposalratio", environment())
-    
+
     ### propose minitrees and accept or reject
     if(which_protocol == "classic") {
       if(p$wh.bottleneck == "complete") {
@@ -510,7 +503,7 @@ update_host_history <- function(hostID, which_protocol) {
     dens.infectorcurrent[hostID] <- 0
     
     # logproposalratio <- log(dens.infectorcurrent[infector.current.ID] * sum(dens.infectorproposal)/
-    #                           (dens.infectorproposal[infector.proposed.ID] * sum(dens.infectorcurrent))) 
+    #                           (dens.infectorproposal[infector.proposed.ID] * sum(dens.infectorcurrent)))
     logproposalratio <- log(dens.infectorcurrent[infector.current.ID] * sum(dens.infectorproposal)/
                               (dens.infectorproposal[infector.proposed.ID] * sum(dens.infectorcurrent))) +
       dgamma(v$nodetimes[hostID] - v$inftimes[hostID],
@@ -518,11 +511,12 @@ update_host_history <- function(hostID, which_protocol) {
              scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) -
       dgamma(v$nodetimes[hostID] - tinf.prop,
              shape = tinf.prop.shape.mult * p$sample.shape,
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)
-    
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) +
+      lastneg_logratio_correction(hostID, v$inftimes[hostID], tinf.prop, p, d)
+
     copy2pbe1("infector.proposed.ID", environment())
     copy2pbe1("logproposalratio", environment())
-    
+
     ### propose minitrees and accept or reject
     if(which_protocol == "classic") {
       if(p$wh.bottleneck == "complete") {
@@ -555,6 +549,9 @@ update_host_history <- function(hostID, which_protocol) {
     #         0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape)) +
     #   pnorm(v$inftimes[hostID] - v$inftimes[infectee.first.ID] - 2 * v$nodetimes[hostID], 
     #         0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape))
+    # TODO(last.negative): MH correction for path F not yet derived under the
+    # index-swap; tinf.prop here is not directly hostID's post-acceptance inftime.
+    # Acceptable when last.negative is unset for hostID; biased otherwise.
     logproposalratio <- pgamma(v$nodetimes[infectee.first.ID] - v$inftimes[infectee.first.ID],
                                shape = tinf.prop.shape.mult * p$sample.shape,
                                scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log.p = TRUE) -
@@ -662,7 +659,8 @@ update_host_history <- function(hostID, which_protocol) {
              scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) -
       dgamma(v$nodetimes[hostID] - tinf.prop,
              shape = tinf.prop.shape.mult * p$sample.shape,
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) +
+      lastneg_logratio_correction(hostID, v$inftimes[hostID], tinf.prop, p, d)
 
     if (infector.proposed.ID == p$obs+1) infector.proposed.ID <- 0
     else if (!is.null(d$admission.times)) {
@@ -795,31 +793,32 @@ update_host_history <- function(hostID, which_protocol) {
     
     
     ### calculate proposal ratio
-    logproposalratio <- dgamma(pbe0$v$nodetimes[hostID] - pbe0$v$inftimes[hostID], 
-                               shape = tinf.prop.shape.mult * p$sample.shape, 
-                               scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) - 
-      dgamma(v$nodetimes[hostID] - v$inftimes[hostID], 
-             shape = tinf.prop.shape.mult * p$sample.shape, 
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)
-    
+    logproposalratio <- dgamma(pbe0$v$nodetimes[hostID] - pbe0$v$inftimes[hostID],
+                               shape = tinf.prop.shape.mult * p$sample.shape,
+                               scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) -
+      dgamma(v$nodetimes[hostID] - v$inftimes[hostID],
+             shape = tinf.prop.shape.mult * p$sample.shape,
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) +
+      lastneg_logratio_correction(hostID, pbe0$v$inftimes[hostID], tinf.prop, p, d)
+
     ### update proposal environment
     copy2pbe1("v", le)
-    
+
     ### calculate likelihood
     propose_pbe("trans")
-    
+
     ### calculate acceptance probability
-    logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal + pbe1$logLikdist - 
+    logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal + pbe1$logLikdist -
       pbe0$logLikgen - pbe0$logLiksam - pbe0$logLikcoal - pbe0$logLikdist + logproposalratio
-    
+
     ### accept or reject
     if (runif(1) < exp(logaccprob)) {
       accept_pbe("trans")
     }
   }
-  
-  
-  ### update if hostID is not index and tinf.prop is after the MRCA of hostID and infector 
+
+
+  ### update if hostID is not index and tinf.prop is after the MRCA of hostID and infector
   update_pathH <- function() {
     ### making variables and parameters available within the function
     le <- environment()
@@ -864,28 +863,29 @@ update_host_history <- function(hostID, which_protocol) {
     
     ### calculate proposal ratio
     logproposalratio <- dgamma(pbe0$v$nodetimes[hostID] - pbe0$v$inftimes[hostID],
-                               shape = tinf.prop.shape.mult * p$sample.shape, 
-                               scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) - 
-      dgamma(v$nodetimes[hostID] - v$inftimes[hostID], 
-             shape = tinf.prop.shape.mult * p$sample.shape, 
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)
-    
-    
+                               shape = tinf.prop.shape.mult * p$sample.shape,
+                               scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) -
+      dgamma(v$nodetimes[hostID] - v$inftimes[hostID],
+             shape = tinf.prop.shape.mult * p$sample.shape,
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) +
+      lastneg_logratio_correction(hostID, pbe0$v$inftimes[hostID], tinf.prop, p, d)
+
+
     ### calculate likelihood
     propose_pbe("trans")
-    
+
     ### calculate acceptance probability
-    logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal - pbe0$logLikgen - pbe0$logLiksam - pbe0$logLikcoal + 
+    logaccprob <- pbe1$logLikgen + pbe1$logLiksam + pbe1$logLikcoal - pbe0$logLikgen - pbe0$logLiksam - pbe0$logLikcoal +
       logproposalratio
-    
+
     ### accept or reject
     if (runif(1) < exp(logaccprob)) {
       accept_pbe("trans")
     }
   }
-  
-  
-  ### update if hostID is not index, tinf.prop is before the MRCA of hostID and infector, and infector is index 
+
+
+  ### update if hostID is not index, tinf.prop is before the MRCA of hostID and infector, and infector is index
   update_pathI <- function() {
     ### making variables and parameters available within the function
     le <- environment()
@@ -961,18 +961,22 @@ update_host_history <- function(hostID, which_protocol) {
     copy2pbe1("v", le)
     
     ### calculate proposal ratio
+    ### Note: the log(1 - pgamma(... - timemrca, ...)) terms below are truncated-Gamma
+    ### normalizers for the NNY proposal branch and are independent of the last-negative
+    ### correction added at the end.
     logproposalratio <- dgamma(pbe0$v$nodetimes[hostID] - pbe0$v$inftimes[hostID],
                                shape = tinf.prop.shape.mult * p$sample.shape,
-                               scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) - 
+                               scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) -
       log(1 - pgamma(v$nodetimes[hostID] - timemrca,
-                     shape = tinf.prop.shape.mult * p$sample.shape, 
-                     scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape))) + 
-      log(1 - pgamma(pbe0$v$nodetimes[hostiorID] - timemrca, 
-                     shape = tinf.prop.shape.mult * p$sample.shape, 
-                     scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape))) - 
-      dgamma(v$nodetimes[hostiorID] - v$inftimes[hostiorID], 
-             shape = tinf.prop.shape.mult * p$sample.shape, 
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)
+                     shape = tinf.prop.shape.mult * p$sample.shape,
+                     scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape))) +
+      log(1 - pgamma(pbe0$v$nodetimes[hostiorID] - timemrca,
+                     shape = tinf.prop.shape.mult * p$sample.shape,
+                     scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape))) -
+      dgamma(v$nodetimes[hostiorID] - v$inftimes[hostiorID],
+             shape = tinf.prop.shape.mult * p$sample.shape,
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) +
+      lastneg_logratio_correction(hostID, pbe0$v$inftimes[hostID], tinf.prop, p, d)
     
     
     
@@ -1066,18 +1070,19 @@ update_host_history <- function(hostID, which_protocol) {
     copy2pbe1("v", le)
     
     ### calculate proposal ratio
-    logproposalratio <- dgamma(pbe0$v$nodetimes[hostID] - pbe0$v$inftimes[hostID], 
-                               shape = tinf.prop.shape.mult * p$sample.shape, 
-                               scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) - 
-      dgamma(v$nodetimes[hostID] - v$inftimes[hostID], 
-             shape = tinf.prop.shape.mult * p$sample.shape, 
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) + 
-      dgamma(pbe0$v$nodetimes[hostiorID] - pbe0$v$inftimes[hostiorID], 
-             shape = tinf.prop.shape.mult * p$sample.shape, 
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) - 
-      dgamma(v$nodetimes[hostiorID] - v$inftimes[hostiorID], 
-             shape = tinf.prop.shape.mult * p$sample.shape, 
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)
+    logproposalratio <- dgamma(pbe0$v$nodetimes[hostID] - pbe0$v$inftimes[hostID],
+                               shape = tinf.prop.shape.mult * p$sample.shape,
+                               scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) -
+      dgamma(v$nodetimes[hostID] - v$inftimes[hostID],
+             shape = tinf.prop.shape.mult * p$sample.shape,
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) +
+      dgamma(pbe0$v$nodetimes[hostiorID] - pbe0$v$inftimes[hostiorID],
+             shape = tinf.prop.shape.mult * p$sample.shape,
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) -
+      dgamma(v$nodetimes[hostiorID] - v$inftimes[hostiorID],
+             shape = tinf.prop.shape.mult * p$sample.shape,
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) +
+      lastneg_logratio_correction(hostID, pbe0$v$inftimes[hostID], tinf.prop, p, d)
     
     
     ### calculate likelihood
