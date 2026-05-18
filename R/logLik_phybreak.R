@@ -48,7 +48,7 @@ logLik.phybreak <- function(object, genetic = TRUE, withinhost = TRUE, sampling 
     res <- res + with(object, lik_gentimes(list(p = p, v = v)))
   }
   if (sampling) {
-    res <- res + with(object, lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes))
+    res <- res + with(object, lik_sampletimes(p$obs, p$sample.shape, p$sample.mean, v$nodetimes, v$inftimes, d$last.negative))
   }
   if (withinhost) {
     objectenv <- object
@@ -97,9 +97,36 @@ lik_gentimes <- function(le){
                                              le = le, log = TRUE)))
 }
 
-### calculate the log-likelihood of sampling intervals 
-lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes) {
-  sum(dgamma(nodetimes[1:obs] - inftimes, shape = shapeS, scale = meanS/shapeS, log = TRUE))
+### calculate the log-likelihood of sampling intervals
+###
+### When last.negative[i] is set, host i's sampling interval D_i = nodetime_i - tinf_i
+### is constrained to D_i < M_i where M_i = nodetime_i - last.negative_i (perfect-test
+### assumption: tinf_i > last.negative_i). The likelihood for such hosts is the
+### Gamma density truncated to (0, M_i):
+###
+###   log f(D_i) - log F(M_i, shape, scale)   if D_i < M_i
+###   -Inf                                    otherwise
+###
+### The -log F(M_i) normalizer is required for unbiased inference of shapeS/meanS:
+### without it, the conditioning event D_i < M_i is absorbed into the data without
+### the corresponding likelihood penalty for parameters that put little mass in (0, M_i).
+lik_sampletimes <- function(obs, shapeS, meanS, nodetimes, inftimes, last.negative = NULL) {
+  scaleS <- meanS / shapeS
+  D <- nodetimes[1:obs] - inftimes[1:obs]
+  log_dens <- dgamma(D, shape = shapeS, scale = scaleS, log = TRUE)
+
+  if (length(last.negative) > 0) {
+    ln <- last.negative[1:obs]
+    has_lastneg <- !is.na(ln)
+    if (any(has_lastneg)) {
+      M <- nodetimes[1:obs][has_lastneg] - ln[has_lastneg]
+      if (any(D[has_lastneg] >= M)) return(-Inf)
+      log_trunc_norm <- pgamma(M, shape = shapeS, scale = scaleS, log.p = TRUE)
+      return(sum(log_dens) - sum(log_trunc_norm))
+    }
+  }
+
+  sum(log_dens)
 }
 
 

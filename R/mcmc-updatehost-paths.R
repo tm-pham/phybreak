@@ -83,7 +83,8 @@ update_host_keepphylo <- function(hostID) {
   
   ### Propose infection time. If d$last.negative[hostID] is set, propose_tinf_lastneg
   ### conditions on a negative test there; the corresponding MH proposal-ratio
-  ### correction is applied in path G/H/I/J via lastneg_logratio_correction().
+  ### correction is applied in paths G/H/J via lastneg_logratio_correction().
+  ### Path I refuses the move when hostID has a last-negative date (see C2 fix).
   tinf.prop <- propose_tinf_lastneg(hostID, p, v, pbe1$d)
   if (is.na(tinf.prop)) return()
 
@@ -899,7 +900,19 @@ update_host_history <- function(hostID, which_protocol) {
     tinf.prop <- pbe1$tinf.prop
     tinf2.prop <- pbe1$tinf2.prop
     timemrca <- pbe1$timemrca
-    
+
+    ### Refuse path I when hostID has a last-negative date.
+    ### update_host_keepphylo overwrites tinf.prop with the deterministic value
+    ### v$inftimes[hostiorID] before dispatching here, so hostID's new infection
+    ### time is not a draw from propose_tinf_lastneg. The originally sampled
+    ### tinf.prop only gates entry into this path, and the gating probability is
+    ### distorted by the rejection sampler in propose_tinf_lastneg. The
+    ### corresponding Hastings correction is a numerical integral that has not
+    ### been derived, so we refuse the move. Other paths remain available for
+    ### hosts with a last-negative date. See REVIEW_lastneg.md and
+    ### FIXES_lastneg.md, section C2.
+    if (length(d$last.negative) > 0 && !is.na(d$last.negative[hostID])) return()
+
     ### change to proposal state
     
     ## first the infector: move transmission node downstream
@@ -962,8 +975,9 @@ update_host_history <- function(hostID, which_protocol) {
     
     ### calculate proposal ratio
     ### Note: the log(1 - pgamma(... - timemrca, ...)) terms below are truncated-Gamma
-    ### normalizers for the NNY proposal branch and are independent of the last-negative
-    ### correction added at the end.
+    ### normalizers for the NNY proposal branch. No lastneg_logratio_correction
+    ### is included here because path I is refused (early-return above) whenever
+    ### hostID has a last-negative date.
     logproposalratio <- dgamma(pbe0$v$nodetimes[hostID] - pbe0$v$inftimes[hostID],
                                shape = tinf.prop.shape.mult * p$sample.shape,
                                scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) -
@@ -975,11 +989,8 @@ update_host_history <- function(hostID, which_protocol) {
                      scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape))) -
       dgamma(v$nodetimes[hostiorID] - v$inftimes[hostiorID],
              shape = tinf.prop.shape.mult * p$sample.shape,
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE) +
-      lastneg_logratio_correction(hostID, pbe0$v$inftimes[hostID], tinf.prop, p, d)
-    
-    
-    
+             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log = TRUE)
+
     ### calculate likelihood
     propose_pbe("trans")
     
