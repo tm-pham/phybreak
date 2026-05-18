@@ -18,6 +18,18 @@ rewire_change_infector_wide <- function(ID, newinfector) {
 
 
 rewire_within_wide_edgewise <- function(ID, tinf) {
+  # Enforce last-negative constraint: ID's new infection time must be strictly
+  # after d$last.negative[ID]. C1 already returns -Inf from lik_sampletimes for
+  # violating states, but short-circuiting here avoids the coalescent / topology
+  # work and prevents leaving pbe1$v$inftimes in a guaranteed-rejected state.
+  # See REVIEW_lastneg.md C4 and FIXES_lastneg.md C4.
+  if (length(pbe1$d$last.negative) > 0 &&
+      !is.na(pbe1$d$last.negative[ID]) &&
+      tinf <= pbe1$d$last.negative[ID]) {
+    pbe1$logLiktoporatio <- -Inf
+    return()
+  }
+
   coalnodes <- which(pbe1$v$nodehosts == ID & pbe1$v$nodetypes == "c")
   coaltimes_old <- pbe1$v$nodetimes[coalnodes]
   

@@ -6,3 +6,5 @@ src/*.so
 src/*.dll
 inst/doc
 *.desc
+REVIEW_lastneg.md
+FIXES_lastneg.md

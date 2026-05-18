@@ -44,21 +44,43 @@ update_mS <- function() {
     h <- pbe0$h
     p <- pbe1$p
     v <- pbe1$v
-    
+
     ### change to proposal state
     sumst <- sum(v$nodetimes[v$nodetypes == "s"] - v$inftimes[v$nodehosts[v$nodetypes == "s"]])
-    p$sample.mean <- p$sample.shape/rgamma(1, shape = p$sample.shape * p$obs + 2 + (h$mS.av/h$mS.sd)^2, rate = sumst + (h$mS.av/p$sample.shape) * 
+    p$sample.mean <- p$sample.shape/rgamma(1, shape = p$sample.shape * p$obs + 2 + (h$mS.av/h$mS.sd)^2, rate = sumst + (h$mS.av/p$sample.shape) *
          (1 + (h$mS.av/h$mS.sd)^2))
 
     ### update proposal environment
     copy2pbe1("p", le)
-    
+
     ### calculate likelihood
     propose_pbe("mS")
-    
+
+    ### truncation-normalizer correction (C8): the Gibbs draw above is the full
+    ### conditional under the UNTRUNCATED sample-time likelihood, but C1 made
+    ### the target use the TRUNCATED likelihood. The MH ratio therefore picks
+    ### up the change in the truncation normalizer, sum log pgamma(M_i, shape,
+    ### mean/shape), between old and new sample.mean (sample.shape is unchanged
+    ### in this move). When no host has a last-negative date the correction is
+    ### exactly 0 and behavior collapses to the pre-C1 Gibbs+MH. See
+    ### REVIEW_lastneg.md C8 and FIXES_lastneg.md C8.
+    sumlogF_diff <- 0
+    if (length(d$last.negative) > 0) {
+        ln <- d$last.negative[1:p$obs]
+        has_lastneg <- !is.na(ln)
+        if (any(has_lastneg)) {
+            M <- v$nodetimes[1:p$obs][has_lastneg] - ln[has_lastneg]
+            sf_new <- sum(pgamma(M, shape = pbe1$p$sample.shape,
+                                 scale = pbe1$p$sample.mean / pbe1$p$sample.shape, log.p = TRUE))
+            sf_old <- sum(pgamma(M, shape = pbe0$p$sample.shape,
+                                 scale = pbe0$p$sample.mean / pbe0$p$sample.shape, log.p = TRUE))
+            sumlogF_diff <- sf_old - sf_new
+        }
+    }
+
     ### calculate acceptance probability
-    logaccprob <- pbe1$logLikcoal - pbe0$logLikcoal
-    
+    logaccprob <- pbe1$logLikcoal - pbe0$logLikcoal + sumlogF_diff
+
     ### accept or reject
     # Only execute if logaccprob is not NA, NaN, or Inf
     if (!is.na(logaccprob) && !is.nan(logaccprob) && !is.infinite(logaccprob)) {

@@ -53,6 +53,66 @@ lastneg_logratio_correction <- function(hostID, tinf_old, tinf_new, p, d) {
     log(1 - pgamma(lastneg.time - tinf_new, shape = shape.full, scale = scale.full))
 }
 
+### Log-integral of the (unnormalized) rejection-sampler proposal density over a
+### dispatch region, used for paths whose dispatch is gated on tinf.prop but
+### whose state change does not use tinf.prop as the new infection time
+### (paths C and F; see REVIEW_lastneg.md C3 and FIXES_lastneg.md C3).
+###
+### Under last-negative the proposal density for refID's tinf is
+###     q_lastneg(t) is proportional to Gamma_prop(nodetime[refID] - t) * s(t),
+### with s(t) = 1 - F(lastneg[refID] - t; full). Let D = nodetime[refID] - t.
+### This function returns
+###     log[ integral_{D=0}^{interval} Gamma_prop(D) * s(nodetime[refID] - D) dD ]
+### so that the dispatch-probability ratio P(D < interval_F)/P(D < interval_R)
+### needed in the Hastings correction can be formed by subtracting two calls
+### (the unknown normalizer Z of q_lastneg cancels in the ratio).
+###
+### Reduces to pgamma(interval, shape_prop, scale_prop, log.p = TRUE) -- the
+### previous expression -- whenever d$last.negative[refID] is NA or absent, so
+### behavior in the no-last-negative case is bit-identical to master.
+lastneg_dispatch_log_integral <- function(interval, refID, p, v, d) {
+  shape.prop <- tinf.prop.shape.mult * p$sample.shape
+  scale.prop <- p$sample.mean / shape.prop
+
+  if (interval <= 0) return(-Inf)
+
+  lastneg <- if (length(d$last.negative) > 0) d$last.negative[refID] else NA_real_
+  if (is.na(lastneg)) {
+    return(pgamma(interval, shape = shape.prop, scale = scale.prop, log.p = TRUE))
+  }
+
+  shape.full <- p$sample.shape
+  scale.full <- p$sample.mean / shape.full
+  M <- v$nodetimes[refID] - lastneg
+
+  if (interval <= M) {
+    return(pgamma(interval, shape = shape.prop, scale = scale.prop, log.p = TRUE))
+  }
+
+  lower <- max(M, 0)
+  integrand <- function(D) {
+    dgamma(D, shape = shape.prop, scale = scale.prop) *
+      (1 - pgamma(D - M, shape = shape.full, scale = scale.full))
+  }
+  result <- tryCatch(
+    integrate(integrand, lower = lower, upper = interval),
+    error = function(e) list(message = conditionMessage(e), value = NA_real_)
+  )
+  if (is.na(result$value) || identical(result$message, "OK") == FALSE) {
+    warning("lastneg_dispatch_log_integral: integration failed (", result$message,
+            "); refID=", refID, ", interval=", interval, ", M=", M)
+    return(-Inf)
+  }
+  log_tail <- if (result$value > 0) log(result$value) else -Inf
+
+  if (M <= 0) return(log_tail)
+
+  log_head <- pgamma(M, shape = shape.prop, scale = scale.prop, log.p = TRUE)
+  m <- max(log_head, log_tail)
+  if (is.infinite(m) && m < 0) return(-Inf)
+  m + log(exp(log_head - m) + exp(log_tail - m))
+}
+
 ### fork to the requested update protocol
 update_host <- function(hostID, which_protocol, history) {
   ### use protocol
@@ -366,14 +426,15 @@ update_host_history <- function(hostID, which_protocol) {
   }
   
   
-  ### update if hostID is index and tinf.prop is after the second secondary case 
+  ### update if hostID is index and tinf.prop is after the second secondary case
   update_pathC <- function(which_protocol) {
     ### Make input locally available
+    d <- pbe0$d
     p <- pbe0$p
     v <- pbe0$v
     hostID <- pbe1$hostID
     tinf.prop <- pbe1$tinf.prop
-    
+
     ### calculate proposal ratio
     # second infectee not necessarily the same for reversal proposal, so identify these intervals for hostID and new index
     infectees.hostID <- which(pbe0$v$infectors == hostID)
@@ -385,22 +446,24 @@ update_host_history <- function(hostID, which_protocol) {
       infectees.newindex <- which(pbe0$v$infectors == newindexID)
       pbe0$v$nodetimes[newindexID] - sort(c(pbe0$v$inftimes[infectees.newindex], Inf))[1]
     }
-    
-    # logproposalratio <- pnorm(v$inftimes[newindexID] - v$nodetimes[newindexID] + sampleinterval.newindex, 
+
+    # logproposalratio <- pnorm(v$inftimes[newindexID] - v$nodetimes[newindexID] + sampleinterval.newindex,
     #                           0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape)) -
-    #   pnorm(v$inftimes[newindexID] - v$nodetimes[newindexID] - sampleinterval.newindex, 
+    #   pnorm(v$inftimes[newindexID] - v$nodetimes[newindexID] - sampleinterval.newindex,
     #         0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape)) -
-    #   pnorm(v$inftimes[hostID] - v$nodetimes[hostID] + sampleinterval.hostID, 
+    #   pnorm(v$inftimes[hostID] - v$nodetimes[hostID] + sampleinterval.hostID,
     #         0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape)) +
-    #   pnorm(v$inftimes[hostID] - v$nodetimes[hostID] - sampleinterval.hostID, 
+    #   pnorm(v$inftimes[hostID] - v$nodetimes[hostID] - sampleinterval.hostID,
     #         0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape))
-    # TODO(last.negative): MH correction for path C not yet derived under the
-    # index-swap; tinf.prop here is not directly hostID's post-acceptance inftime.
-    # Acceptable when last.negative is unset for hostID; biased otherwise.
-    logproposalratio <- pgamma(sampleinterval.newindex, shape = tinf.prop.shape.mult * p$sample.shape,
-                               scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log.p = TRUE) -
-      pgamma(sampleinterval.hostID, shape = tinf.prop.shape.mult * p$sample.shape,
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log.p = TRUE)
+    # Each lastneg_dispatch_log_integral() call collapses to the previous
+    # pgamma(sampleinterval.*, shape_prop, scale_prop, log.p = TRUE) whenever
+    # the corresponding host has no last-negative date, so logproposalratio is
+    # bit-identical to master in that case. Under last-negative the rejection
+    # sampler in propose_tinf_lastneg() distorts the proposal density for
+    # tinf.prop, and the dispatch-region probabilities pick up that distortion.
+    # See FIXES_lastneg.md C3.
+    logproposalratio <- lastneg_dispatch_log_integral(sampleinterval.newindex, newindexID, p, v, d) -
+      lastneg_dispatch_log_integral(sampleinterval.hostID, hostID, p, v, d)
     copy2pbe1("logproposalratio", environment())
 
     ### propose minitrees and accept or reject
@@ -537,28 +600,31 @@ update_host_history <- function(hostID, which_protocol) {
   ### update if hostID is not index and tinf.prop is after the first secondary case
   update_pathF <- function(which_protocol) {
     ### Make input locally available
+    d <- pbe0$d
     p <- pbe0$p
     v <- pbe0$v
     hostID <- pbe1$hostID
     tinf.prop <- pbe1$tinf.prop
-    
-    
+
+
     ### calculate proposal ratio
     infectees.hostID <- which(v$infectors == hostID)
     infectee.first.ID <- infectees.hostID[v$inftimes[infectees.hostID] == min(v$inftimes[infectees.hostID])]
-    # logproposalratio <-  -  pnorm(v$inftimes[hostID] - v$inftimes[infectee.first.ID] - 2 * v$nodetimes[infectee.first.ID], 
+    # logproposalratio <-  -  pnorm(v$inftimes[hostID] - v$inftimes[infectee.first.ID] - 2 * v$nodetimes[infectee.first.ID],
     #         0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape)) +
-    #   pnorm(v$inftimes[hostID] - v$inftimes[infectee.first.ID] - 2 * v$nodetimes[hostID], 
+    #   pnorm(v$inftimes[hostID] - v$inftimes[infectee.first.ID] - 2 * v$nodetimes[hostID],
     #         0, 0.5 * pbe0$h$mS.av / sqrt(p$sample.shape))
-    # TODO(last.negative): MH correction for path F not yet derived under the
-    # index-swap; tinf.prop here is not directly hostID's post-acceptance inftime.
-    # Acceptable when last.negative is unset for hostID; biased otherwise.
-    logproposalratio <- pgamma(v$nodetimes[infectee.first.ID] - v$inftimes[infectee.first.ID],
-                               shape = tinf.prop.shape.mult * p$sample.shape,
-                               scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log.p = TRUE) -
-      pgamma(v$nodetimes[hostID] - v$inftimes[infectee.first.ID],
-             shape = tinf.prop.shape.mult * p$sample.shape,
-             scale = p$sample.mean/(tinf.prop.shape.mult * p$sample.shape), log.p = TRUE)
+    # Each lastneg_dispatch_log_integral() call collapses to the previous
+    # pgamma(interval, shape_prop, scale_prop, log.p = TRUE) whenever the
+    # corresponding host has no last-negative date, so logproposalratio is
+    # bit-identical to master in that case. Under last-negative the rejection
+    # sampler in propose_tinf_lastneg() distorts the proposal density for
+    # tinf.prop, and the dispatch-region probabilities pick up that distortion.
+    # See FIXES_lastneg.md C3.
+    logproposalratio <- lastneg_dispatch_log_integral(
+      v$nodetimes[infectee.first.ID] - v$inftimes[infectee.first.ID], infectee.first.ID, p, v, d) -
+      lastneg_dispatch_log_integral(
+        v$nodetimes[hostID] - v$inftimes[infectee.first.ID], hostID, p, v, d)
     copy2pbe1("logproposalratio", environment())
     
     ### propose minitrees and accept or reject
