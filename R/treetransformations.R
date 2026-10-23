@@ -234,7 +234,17 @@ transphylo2phybreak <- function(vars, resample = FALSE, resamplepars = NULL,
       pbe1$v$nodeparents[(nsamples+1):(nsamples+nhosts-1)] <- c(0,tail(np, nhosts - 2)+nsamples-nhosts)
       pbe1$v$nodeparents[(2*nsamples):(2*nsamples + nhosts - 1)] <- np[1:nhosts] + nsamples-nhosts
       invisible(sapply(1:nhosts, rewire_pullnodes_complete))
-      invisible(sample_coaltimes_history(init = TRUE))
+      ### sample_coaltimes_history() returns TRUE if it could not assign the sampled
+      ### coalescent times to the NJ topology. The coalescent nodes then still hold
+      ### the times given by rewire_pullnodes_complete(0) under a different topology,
+      ### which makes branch lengths negative and the sequence likelihood NaN, so
+      ### such a tree must never be returned.
+      for (attempt in 1:5) {
+        failed <- sample_coaltimes_history(init = TRUE)
+        if (!failed) break
+      }
+      if (failed) stop("could not assign coalescent times to the neighbour-joining history tree; ",
+                       "use use.NJtree = FALSE or a different `introductions` start")
       
       res <- environment2phybreak(pbe1$v)
       

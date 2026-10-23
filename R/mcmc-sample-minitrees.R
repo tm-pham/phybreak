@@ -166,7 +166,20 @@ sample_coaltimes_history <- function(init = FALSE) {
   coalnodes <- which(pbe1$v$nodehosts == 0 & pbe1$v$nodetypes == "c")
   newcoaltimes <- rev(sample_coaltimes(edgeintimes, NA, pbe1$p, TRUE))
   
-  if (init) newcoaltimes <- newcoaltimes - abs(min(pbe1$v$inftimes) - max(newcoaltimes))
+  ### At initialisation the topology comes from a neighbour-joining tree and is
+  ### unrelated to the order in which these coalescent times were sampled, so the
+  ### times can only be assigned to it (below) if every one of them lies strictly
+  ### before the earliest introduction. Shift them back accordingly, with the gap
+  ### to the earliest introduction drawn from the history-host coalescent model
+  ### with all lineages present. The previous shift placed the latest coalescence
+  ### exactly at min(inftimes); whether the strict comparison below then passed
+  ### depended on floating-point rounding (differences of ~1e-14), and when it
+  ### failed the coalescent nodes kept the times of a different topology, which
+  ### gave negative branch lengths and a NaN sequence likelihood.
+  if (init && length(newcoaltimes) > 0) {
+    gap <- rexp(1, rate = choose(length(edgeintimes), 2) / pbe1$p$wh.history)
+    newcoaltimes <- newcoaltimes - max(0, max(newcoaltimes) - min(pbe1$v$inftimes)) - gap
+  }
   
   ### starting in the history tips, go backwards and give new time to 
   # sampled coalescent node

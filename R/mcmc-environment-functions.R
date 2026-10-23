@@ -161,6 +161,24 @@ build_pbe <- function(phybreak.obj) {
 }
 
 
+### Refuse to start a sampler from a state with a non-finite log-likelihood.
+### Every Metropolis-Hastings ratio is then NaN, every proposal is rejected
+### with an mh_accept() warning, and the chain would return its start state as
+### if it were a posterior sample. Called by burnin_phybreak() and
+### sample_phybreak() directly after build_pbe().
+check_finite_loglik_pbe0 <- function(caller) {
+  terms <- unlist(mget(names(pbe0)[grepl("logLik", names(pbe0))], envir = pbe0))
+  bad <- terms[!is.finite(terms)]
+  if(length(bad) > 0) {
+    stop(caller, "(): the start state has a non-finite log-likelihood (",
+         paste0(names(bad), " = ", bad, collapse = ", "),
+         "); the sampler cannot move from it. Rebuild the phybreak object, ",
+         "e.g. with a different `introductions` start or use.NJtree = FALSE",
+         call. = FALSE)
+  }
+}
+
+
 ### take the elements d, v, p, and h from pbe0, and s from the function arguments, and make a new phybreak-object. Then
 ### empty the environments and return the new object.  
 destroy_pbe <- function(phybreak.obj.samples) {

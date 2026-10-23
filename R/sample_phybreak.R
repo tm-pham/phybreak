@@ -146,6 +146,7 @@ sample_phybreak <- function(x, nsample, thin = 1, thinswap = 1, classic = 0, kee
   s.posts <- lapply(1:nchains, function(i) s.post)
     
   build_pbe(x)
+  check_finite_loglik_pbe0("sample_phybreak")
   
   envirs <- list()
   npars <- sum(grepl("est", names(x$h)))
