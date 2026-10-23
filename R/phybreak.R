@@ -258,9 +258,10 @@ phybreak <- function(dataset, times = NULL,
   ##############################
   ### second slot: variables ###
   ##############################
+  n_introductions <- ifelse(is.null(parameterslot$introductions), 1, parameterslot$introductions)
+  use_NJtree <- ifelse(is.null(parameterslot$use.NJtree), FALSE, parameterslot$use.NJtree)
   phybreakvariables <- transphylo2phybreak(dataset, resample = !use.tree, resamplepars = parameterslot,
-                                           introductions = ifelse(is.null(parameterslot$introductions), 1, parameterslot$introductions), 
-                                           NJtree = ifelse(is.null(parameterslot$use.NJtree), FALSE, parameterslot$use.NJtree))
+                                           introductions = n_introductions, NJtree = use_NJtree)
   variableslot <- phybreakvariables$v
   dataslot$reference.date <- phybreakvariables$d$reference.date
   dataslot$names <- phybreakvariables$d$names
@@ -268,14 +269,7 @@ phybreak <- function(dataset, times = NULL,
   #################
   # parameters$mu #
   #################
-  if(is.null(mu)) {
-    treelength <- with(variableslot, sum(nodetimes[nodeparents != 0] - nodetimes[nodeparents]))
-    curparsimony <- phangorn::parsimony(phybreak2phylo(variableslot), dataslot$sequences)
-    sequencelength <- sum(attr(dataslot$sequences, "weight"))
-    parameterslot$mu <- (curparsimony / sequencelength) / treelength / 0.75
-  } else {
-    parameterslot$mu <- mu
-  }
+  parameterslot$mu <- if(is.null(mu)) initial_mu(variableslot, dataslot) else mu
 
   ################################
   ### make the phybreak object ###
@@ -289,6 +283,30 @@ phybreak <- function(dataset, times = NULL,
     )
   
   class(res) <- c("phybreak", "list")
+
+  ###########################################################
+  ### refuse a start state with a non-finite log-likelihood ###
+  ###########################################################
+  ### From a state with a NaN or infinite log-likelihood term the MCMC can never
+  ### move: every acceptance ratio is NaN, every proposal is rejected, and the
+  ### sampler would return this state as if it were a posterior sample. The
+  ### initial tree is random, so redraw it a few times before giving up.
+  loglik_terms <- loglik_terms_phybreak(res)
+  attempt <- 1
+  while(!all(is.finite(loglik_terms)) && !use.tree && attempt < 5) {
+    attempt <- attempt + 1
+    res$v <- transphylo2phybreak(dataset, resample = TRUE, resamplepars = parameterslot,
+                                 introductions = n_introductions, NJtree = use_NJtree)$v
+    if(is.null(mu)) res$p$mu <- initial_mu(res$v, dataslot)
+    loglik_terms <- loglik_terms_phybreak(res)
+  }
+  if(!all(is.finite(loglik_terms))) {
+    bad <- loglik_terms[!is.finite(loglik_terms)]
+    stop("the initial state has a non-finite log-likelihood (",
+         paste0(names(bad), " = ", bad, collapse = ", "),
+         ") after ", attempt, " initial tree draw(s); ",
+         "try a different `introductions` start or use.NJtree = FALSE")
+  }
   
   return(res)
 }
@@ -305,6 +323,23 @@ testdataclass_phybreak <- function(dataset, times, ...) {
   }
   
   return(dataset)
+}
+
+### Initial mutation rate: parsimony changes per site per unit of total branch length
+### (0.75 because a 'mutation' may reassign the same nucleotide)
+initial_mu <- function(variableslot, dataslot) {
+  treelength <- with(variableslot, sum(nodetimes[nodeparents != 0] - nodetimes[nodeparents]))
+  curparsimony <- phangorn::parsimony(phybreak2phylo(variableslot), dataslot$sequences)
+  sequencelength <- sum(attr(dataslot$sequences, "weight"))
+  (curparsimony / sequencelength) / treelength / 0.75
+}
+
+### The separate log-likelihood terms of a phybreak object, named as in the sampler environment
+loglik_terms_phybreak <- function(x) {
+  c(logLikseq  = as.numeric(logLik(x, withinhost = FALSE, sampling = FALSE, generation = FALSE, distance = FALSE)),
+    logLikcoal = as.numeric(logLik(x, genetic = FALSE, sampling = FALSE, generation = FALSE, distance = FALSE)),
+    logLikgen  = as.numeric(logLik(x, genetic = FALSE, withinhost = FALSE, sampling = FALSE, distance = FALSE)),
+    logLiksam  = as.numeric(logLik(x, genetic = FALSE, withinhost = FALSE, generation = FALSE, distance = FALSE)))
 }
 
 ### Test for presence of tree

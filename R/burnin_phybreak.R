@@ -82,6 +82,7 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
   historydistribution <- c(historydist, 1 - historydist)
   
   build_pbe(x)
+  check_finite_loglik_pbe0("burnin_phybreak")
   npars <- sum(grepl("est", names(x$h)))
   
   envirs <- list()
