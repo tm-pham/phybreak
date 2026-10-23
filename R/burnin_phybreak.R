@@ -136,7 +136,7 @@ burnin_phybreak <- function(x, ncycles, classic = 0, keepphylo = 0, withinhost_o
         if (i == -4 && x$h$est.wh.s)  update_wh_slope()
         if (i == -5 && x$h$est.wh.e)  update_wh_exponent()
         if (i == -6 && x$h$est.wh.0)  update_wh_level()
-        if (i < -6) x$updaters[[-6 - i]]
+        if (i < -6) x$updaters[[-6 - i]]()
         # 
         # 
         # if (i == -7 && x$h$est.wh.h)  update_wh_history()
